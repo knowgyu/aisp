@@ -3,8 +3,8 @@
 AI 역사 ~ LLM 2일차까지
 
 https://github.com/heury
-https://heury.github.io/llm_lecture2/#/2
-
+https://heury.github.io/llm_lecture2/#/2 
+https://github.com/heury/llm_hands_on 실습자료 등
 
 pg82. 절대위치 삼각함수
 -> 위치인코딩의 가까운 관계와 먼 관계표현을 위해 삼각함수 주기를 늘림.(찾아보기)
