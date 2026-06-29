@@ -12,3 +12,9 @@ pg82. 절대위치 삼각함수
 실습 Ch.1 / Ch.2 진행. Ch.2는 시험범위 O
 정답은 `https://github.com/heury/llm_hands_on/tree/exercise_answer` (브랜치 확인)
 
+pg110. Masking
+GPT는 미래 토큰 확인 불가. -> Masking(-inf 값을 주어 sigmoid 시 0이 되도록)
+양방향 문맥을 볼 수 있는 masked ~~는 미래토큰확인가능
+
+? attention map에서 input과 output이 같은 상황에서의 값은 무슨 의미일지? (나를 입력했을 때 내 뒤에꺼가 나올 확률일 것 같은데. (self-attention))
+
