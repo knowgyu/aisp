@@ -1,0 +1,1 @@
+var e=``+new URL(`slide-044-image-01-af6fd05695-CokoT6OG.png`,import.meta.url).href;export{e as t};

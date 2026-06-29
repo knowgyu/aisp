@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="500" viewBox="0 125 720 535" role="img" aria-labelledby="title desc">
+  <title id="title">Duck image feature is larger than duck text feature</title>
+  <desc id="desc">A duck image on the left expands into many visual feature vectors, while the duck text on the right is represented by only a few token vectors.</desc>
+
+  <rect x="0" y="125" width="720" height="535" fill="#fbfaf7"/>
+
+  <g font-family="Arial, sans-serif" transform="translate(0 18)">
+    <text x="76" y="158" font-size="28" font-weight="800" fill="#d97706">Duck Image</text>
+    <text x="76" y="186" font-size="16" fill="#4b5563">many visual feature vectors</text>
+
+    <ellipse cx="174" cy="284" rx="86" ry="54" fill="#fbbf24" stroke="#92400e" stroke-width="4"/>
+    <circle cx="244" cy="250" r="38" fill="#fcd34d" stroke="#92400e" stroke-width="4"/>
+    <path d="M273 248 L320 234 L280 270 Z" fill="#f97316" stroke="#9a3412" stroke-width="3"/>
+    <circle cx="253" cy="238" r="5" fill="#111827"/>
+    <path d="M115 255 C78 226 74 301 118 292" fill="#f59e0b" stroke="#92400e" stroke-width="4"/>
+    <path d="M122 334 L103 368 M200 334 L220 368" stroke="#92400e" stroke-width="5" stroke-linecap="round"/>
+    <path d="M88 376 Q105 364 122 376 M203 376 Q220 364 238 376" stroke="#d97706" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path d="M132 270 C162 244 211 249 230 280 C191 270 163 278 132 270 Z" fill="#fde68a" opacity="0.85"/>
+
+    <text x="76" y="430" font-size="18" font-weight="800" fill="#92400e">image feature field</text>
+    <g fill="#f59e0b">
+      <rect x="78" y="456" width="24" height="24" rx="5"/><rect x="112" y="456" width="24" height="24" rx="5"/><rect x="146" y="456" width="24" height="24" rx="5"/><rect x="180" y="456" width="24" height="24" rx="5"/><rect x="214" y="456" width="24" height="24" rx="5"/><rect x="248" y="456" width="24" height="24" rx="5"/><rect x="282" y="456" width="24" height="24" rx="5"/>
+      <rect x="78" y="490" width="24" height="24" rx="5"/><rect x="112" y="490" width="24" height="24" rx="5"/><rect x="146" y="490" width="24" height="24" rx="5"/><rect x="180" y="490" width="24" height="24" rx="5"/><rect x="214" y="490" width="24" height="24" rx="5"/><rect x="248" y="490" width="24" height="24" rx="5"/><rect x="282" y="490" width="24" height="24" rx="5"/>
+      <rect x="78" y="524" width="24" height="24" rx="5"/><rect x="112" y="524" width="24" height="24" rx="5"/><rect x="146" y="524" width="24" height="24" rx="5"/><rect x="180" y="524" width="24" height="24" rx="5"/><rect x="214" y="524" width="24" height="24" rx="5"/><rect x="248" y="524" width="24" height="24" rx="5"/><rect x="282" y="524" width="24" height="24" rx="5"/>
+      <rect x="78" y="558" width="24" height="24" rx="5"/><rect x="112" y="558" width="24" height="24" rx="5"/><rect x="146" y="558" width="24" height="24" rx="5"/><rect x="180" y="558" width="24" height="24" rx="5"/><rect x="214" y="558" width="24" height="24" rx="5"/><rect x="248" y="558" width="24" height="24" rx="5"/><rect x="282" y="558" width="24" height="24" rx="5"/>
+    </g>
+    <text x="108" y="622" font-size="20" font-weight="800" fill="#111827">many vectors</text>
+  </g>
+
+  <text x="356" y="422" font-family="Arial, sans-serif" font-size="92" font-weight="900" fill="#111827">&gt;</text>
+
+  <g font-family="Arial, sans-serif" transform="translate(0 18)">
+    <text x="468" y="158" font-size="28" font-weight="800" fill="#2563eb">Text</text>
+    <text x="468" y="186" font-size="16" fill="#4b5563">few token vectors</text>
+
+    <rect x="456" y="244" width="184" height="90" rx="18" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>
+    <text x="501" y="299" font-size="36" font-weight="800" fill="#1d4ed8">"오리"</text>
+
+    <text x="468" y="430" font-size="18" font-weight="800" fill="#1d4ed8">text feature</text>
+    <g fill="#2563eb">
+      <rect x="468" y="456" width="40" height="40" rx="8"/>
+      <rect x="520" y="456" width="40" height="40" rx="8"/>
+      <rect x="572" y="456" width="40" height="40" rx="8"/>
+    </g>
+    <text x="482" y="536" font-size="20" font-weight="800" fill="#111827">few vectors</text>
+  </g>
+
+</svg>
