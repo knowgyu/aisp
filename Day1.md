@@ -18,3 +18,7 @@ GPT는 미래 토큰 확인 불가. -> Masking(-inf 값을 주어 sigmoid 시 0�
 
 ? attention map에서 input과 output이 같은 상황에서의 값은 무슨 의미일지? (나를 입력했을 때 내 뒤에꺼가 나올 확률일 것 같은데. (self-attention))
 
+pg122 RMS Nomalization을 요새 많이 사용함. 이유는 평균을 구하는 게 비용이 크기때문.
+(또한, 평균 안 써도 된다는 연구 결과도 있음.)
+But, RMS 구하는 것도 Root Mean Square이다보니, 평균에 대해서 어차피 구하는 것으로 보이는데 뭐가 다른지.
+
