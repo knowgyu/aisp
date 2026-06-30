@@ -60,3 +60,128 @@ Ch7에서는 collate함수와 dataset loader부분만 잘 알면 됨.
 DPO쪽에서는 loss함수.
 
 뒤 강의내용은 시험범위 X
+
+---
+
+## 중요한 부분
+
+### Ch.2  
+encode하고 decode하는 부분. allowed_special도.  
+target은 1 shift되어 [1:context_length]인것도.  
+
+즉, 입력이 있을 때, target은 1만큼 shift되는 것 중요.
+
+DataLoader는 dataset에서 batch로 해서 drop_last(버릴것버리기)
+데이터 어떻게 불러들일지 알려주는 애.
+
+embedding layer 만들 때 갯수는 임베딩 객체가 다 담겨있는 것.
+vocab_size은 tokenizer에 종속된 것, output_dim은 설계하기 나름.
+위치 임베딩은 context_length만큼만 가지면 됨. output_dim이야 token emb와 동일해야.
+
+입력은 [8, 4, 256]크기인데, 위치는 [4, 256]임. broadcasting됨.
+
+토크나이저 비교는 참고만.
+
+### Ch.3
+
+q, k, v 나누기 위해 layer 선언.
+d_in은 embedding 차원과 동일. 출력차원은 정의하기 나름.
+GPT모델 내부에서는 multi head attention 고려하여 맞춰줘야함.
+
+forward쪽에서 mask있는데 이건 1개만 있으면 되니깐 미리 register_buffer로 잡아둠
+
+q,k,v 통과시키고, qK^T 해서 attention scores 만들어둠.
+여기서 마스킹할 때 -torch.inf 넣어둬야 softmax 시 0으로 됨.
+
+-> attention weights = softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+나눠주는 이유는 너무 커지는 것 막기 위해 임베딩차원의 루트로.
+
+이후 context_vec = attn_weights @ values
+
+Multihead attention은 차원 맞추기 위해 head_dim = d_out // num_heads로 해준다는 것만 기억.
+
+### Ch.4 
+
+LayerNorm에서 scale, shift 정의해놔야하고, scale은 1로 해놓고, 시프트는 0(수식상 당연)
+norm_x = (x - mean) / torch.sqrt(var + self.eps) eps는 당연히 0으로 안 나누게
+
+FF에서 처음에 입력은 임베딩 차원과 동일해야하고,(잔차연결해서 넘어오니깐 처음인풋과 동일)
+출력은 N배 뻥튀기. ex) 768 -> 3072
+GELU 돌리고, 다시 돌려놔야하니 3072 -> 768로
+
+TransformerBlock에서는 Attention과 FeedForward가 중요.
+교안에서는 Pre-Norm으로.
+
+이 블럭에서 forward가 중요
+shortcut <- 잔차연결위해.
+x에 정규화하고 어텐션하고 드랍아웃하고 잔차연결.
+이후 피드포워드에서 또 
+shortcut <- 잔차연결위해 잡아놓고
+정규화, 피드포워드, 드랍아웃, 잔차연결.
+
+GPT모델에서는 이제 입려부터 신경쓰니
+tok_emb, pos_emb, drop_emb 잡아놓고
+블럭 쌓고
+마지막 정규화 final_norm = LayerNorm(cfg["emb_dim])과
+out_head = nn.Linear(emb_dim , vocab_size)  요기선 vocab_size가 출력인거 중요.
+
+이제 실제 forward할땐 x = tok_embeds + pos_embeds 해놓고 드랍아웃하고 이제 트랜스포머 통과
+이후 final_norm해놓고 out_head해서 각 단어에 대한 예측 점수 (logits) 나옴.
+
+모델 추론 전에는 no_grad()해놔서 gradient 계산 안 하도록 해놓기.
+이후 예측값인 다음단어를 찾아야하니
+logits = logits[:, -1, :]  <-- (batch, n_token, vocab_size) -> (batch, vocab_size)
+
+여기서 가장 확률 높은거 찾아야하니 torch.argmax(logits, dim=-1, keepdim=True)
+
+실제 main에서는 
+불러놓고, 토크나이저 정의하고, 근데 여기서 encoded_tensor은 unsqueeze로 배치차원추가.
+디코딩할때는 씌워놨으니 squeeze(0)으로 빼기
+
+### Ch.5
+
+여기선 cross entrophy 계산이 중요.
+우선, .to(device) 로 메모리에 올려두는것이 다름.
+model.train()은 기본적으로 설정은 되어있으나, 중간에 로그를 남기는 과정에서 추론돌려서
+eval()로 바뀌기에 다시 train으로 바꿔주기 위해서.
+
+optimizer.zero_grad()는 옵티마이저의 기울기 초기화
+
+추론에서는 torch.no_grad()해놓고 추론돌리고 하는 그런 과정.
+그리고 argmax해놓고 torch.cat으로 붙이는 거
+
+input device와 동일하게 model.to(device)동일.
+
+학습 쭉 하고 학습 끝나면 toorch.save로 
+
+### Ch.6
+
+out_features를 num_classes로 하는거랑
+마지막 출력층쪽에있는거만 requires_grad = True고
+나머지는 다 freeze 해야하니 param.requires_grad = False
+
+LoRA에서는 A행렬 일단 가우시안분포로 초기화해놓고 (in_dim, rank)로 B는 0행렬로.
+
+LoRA 만들어놓고, 이제 replace_linear_with_lora함수에서 교체하는거만들기.
+기존 Linear에서 LoRA로 바꾸는 것.
+
+LoRA에서도 나머지는 다 freeze.
+for param in model.parameters():
+    paam.requires_grad = False
+
+두고나서 replace하면 됨. (어차피 새로생성되는거라 안얼어있음.)
+
+### Ch.7
+
+collate 함수에서 패딩시키는데, 입력은 맨뒤꺼빼고, 타겟은 패딩시작되는거 이후 -100으로.
+(즉, Ch.7인 Follow Instructions에서는 -100으로 패딩시키는 것만 잘 생각)
+
+DPO는 데이터에 chosen, rejected만 추가됨. 
+Policy모델있고 계산하는 그런 .
+
+계산할 때 아래 내용이 중요.
+    model_logratios = model_chosen_logprobs - model_rejected_logprobs
+    reference_logratios = reference_chosen_logprobs - reference_rejected_logprobs
+    logits = model_logratios - reference_logratios
+
+그리고 losses = -F.logsigmoid(beta * logits)로 계산되는 과정이 중요.
