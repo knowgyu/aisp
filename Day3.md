@@ -78,6 +78,39 @@ Conv Layer(Building block)으로 되어있는 것에서 그 다음레이어로 �
 > 각 Block의 역할에 대해 조금 더 봐야할 것 같음.(특히 1x1 conv. 채널간 정보합치는 건 알겠는데,)
 > Group Convolutioneh. Depthwise(separable)convolution도, Transposed convolution도.
 
+### Attention
 
+Vision에서는 Transformer에서 Encoder만 사용.
+
+Encoder의 앞에서 인풋임베딩 + QKV만들때까지 -> Embedding Marix(W_E) 와 W_Q, W_K, W_V가 학습대상. 
+QK^T 하고 softmax 때린거랑 V랑 matmul하는데, 여기서 softmax떄리면 QK^T 여기 애가 확률분포(PDF)가 되고
+결국 보면 V행렬에서 V1행 V2행 ... Vn행에 weighted Sum을 하는 식. 
+> QK^T는 사실상 내적이고, 내적이란 말은 similarity.
+![alt text](image-3.png)
+
+깊이방향으로 쌓는 Block과 Multihead는 더 다양한 문맥.너비방향. so themselves가 young, children 가리킬 수 있지만,
+다른 Head에서는 solve와 problem을 보고있을 수 있음.
+
+So-> 깊이 그리고 넓게 할 수 있어서 모든 단어가 다른 문맥으로도 생각해볼수있도록 확장할 수 있는 scalable한 구조.
+
+**ViT**
+
+An Image is worth 16x16 words
+이미지를 16x16패치로 만들로 잘라놓고, 한 줄로 세운 후 flatten하고 linear projection 넘김.
+얘랑 맨 왼쪽에 `*`라는 class 토큰도 두고, 각각에 pos embedding이랑 같이 넣어서 encoder 집어넣음.
+
+Transformer 논문에서는 Post-Norm이였는데 ViT에선 Pre-Norm.
+Encoder의 출력으로는 Class 토큰의 결과만을 사용함. Class토큰의 결과가 이미 나머지에 대해 attention을 했기에 정보를 알고있어서.
+
+MSA(Multihead Self Attention)까지한 결과가 다시 (N+1, D)가 됨. 그렇기에 인코더는 본인의 입력과 출력의 사이즈가 동일해서 계속 이어나갈 수 있음.
+
+이후 실험결과 보면, 데이터셋이 작을 땐 기존 CNN(BiT)보다 못하나, 데이터셋이 커졌을 땐 그래도 좋아짐.(완전 이기는 정도는 아님)
+
+Pos embedding 도 알아서 잘 학습되더라, and Head들도 보면 layer가 얕은곳에서는 헤드간 좁은데부터 먼데까지 좀 다양하긴한데, 모델이 깊어지면서 참조(attention)하는 픽셀거리가 멀어짐.
+즉, 모든 patch들을 다 attention을 하고있는 상황.
+즉, layer가 쌓여갈수록 global attention이 되어가는 중.
+
+> CNN은 kernel사이즈만 보면서 local하게 바라보면서 키워갔음. 물론 쌓여갈수록 넓은 영역을 바라보고는 있으나,
+> Attention과는 구조가 좀 다르고 attention은 처음부터 모든 구조를 봄.
 
 
