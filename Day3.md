@@ -75,7 +75,7 @@ So 기존 Loss landscape에 비해 smooth한 형태를 얻을 수 있어 학습�
 Conv Layer(Building block)으로 되어있는 것에서 그 다음레이어로 갈 때 input size가 다른데,
 이럴 때 쓰는게 Bottleneck block(1x1 conv를 활용해 채널 맞춰주고, (H,W)는 Stride로 조절 가능)
 
-> 각 Block의 역할에 대해 조금 더 봐야할 것 같음.(특히 1x1 conv. 채널간 정보합치는 건 알겠는데,)
+> 각 Block의 역할에 대해 조금 더 봐야할 것 같음.(특히 1x1 conv. 채널간 정보합치는 건 알겠는데, 아, input size는 유지하면서 Kernel 수로 채널 수를 조정하고 싶을 때)
 > Group Convolutioneh. Depthwise(separable)convolution도, Transposed convolution도.
 
 ### Attention
@@ -281,5 +281,59 @@ Track augmentation이라는 것도 나옴.
 
 03_DETR 실습은 13번까지만 나옴. 
 
+`probas = outputs['pred_logits'].softmax(-1)[0, :, :-1]  # 쿼리별 클래스 확률 계산(no-object 제외): shape=(num_queries,num_classes)`
+
+softmax(-1)은 마지막 차원인데, 그 뒤에 [0, :, :-1]에서 맨 뒤가 -1인 이유?
+-> pred_logits는 배치, 쿼리, 클래스인데, 클래스 마지막번호가 no-object임.
+
+내부 텐서 추출 시 사용하는 forward hook도 중요. 어떤 layer에 걸었는지에 따라 텐서 의미 다름.
+논문에서는 backbone CNN 특징맵, encoder layer 마지막에서 self-attention, decoder layer 마지막에서 cross-attention
+`.register_forward_hook`
+
 ### Segmentation
+
+mIoU = Mean IoU 클래스별로 IoU한거. Object Detection과 비슷
+
+[FCN] Semantic Segmentation에 CNN을 도입
+
+FFN 없이 Fully Convolution Network. pooling 5번 거치기에 1/32로 줄어들었으나, 
+결국 정답으로는 다시 원본이미지만큼 만들어놔야함. -> 32배로 만듦.
+-> 억지로 늘린거라 rough한 edge 정보들만 있고, 세밀한 정보 적음.
+-> pool5를 2배하면 pool4와 동일한 크기인데 이걸 합쳐서 또 16배 높여서 원본이미지크기로 만듦.
+-> 위에서 합치고 뻥튀기하기 전에걸 pool3와 합쳐서 또 8배하는 식으로.
+
+-> 8배 업샘플된 결과를 가져 segmentation했다. -> 뭉개진 그림에서 좀 나아짐.
+
+so 기존 CNN에서 뒷부분을 FCN이 아닌, CNN으로 모두 다 사용함.
+결과를 보면 heatmap과 같은 output으로 나오게 되며, 특정확률값이상이면 tabby cat으로 하는 식으로.
+
+[Mask R-CNN]
+Faster R-CNN + FCN -> Mask R-CNN (instance segmentation)
+
+[U-Net] 2015논문. Architecture관점 좋음. CNN for Biomedical Image Segmentation
+
+여기서 Skip conntection은 ResNet과 다름. 압축중인 feature를 팽창중인 feature에 concat시킴.
+패딩을 안 한 이유? only valid convolutions. 즉, padding을 해서 없는 데이터를 갖고하면 edge쪽에서 오염된 결과가 나온다고 봄.
+의료 영상이기에. (종양이 꼭 가운데에 있지 않고, edge쪽에도 있을 수 있는데 패딩 시 오염될 수 있음. feature map이 줄어들지언정 padding ㄴㄴ)
+
+Spatial 정보를 살리기 위해 Skip connection이 있음. 
+
+[Seg-Former] Simple and Efficient Design for Semantic Segmentation with Transformers
+
+Patch를 자를 때 Overlap해서 자름. and CNN처럼 점점 feature map 사이즈를 작아지면서 감. 
+Encoder에서 Decoder로 갈 때 MLP에서 이미지를 다시 H/4 W/4로 만들고 채널을 4C로 고정시킴.
+
+Efficient한 이유? 기존 Transformer에서는 N(# of patches)에 대해 O(N^2)였음.
+-> O(N^2/R)이 됨. (기존에는 Q는 (N,C), K가 (N/R, C)가 됨.)
+
+Positional Embedding이 없음. why?
+zero padding이 위치정보를 주고있다. (2020년 나온 논문 중 있음. feature map에 zero padding 하면서 ㄱ ㄴ 모양을 보고 어느정도 위치정보를 줄 수 있게 됨.)
+
+[SAM] Segment Anything(2023)
+
+Promptable segmentation. 
+
+점 찍거나, 사각형 그리거나, 대충 자유형 도형을 그리거나, 텍스트로 써서 주면 -> 입력 이미지에 valid mask 그려줌.
+
+
 
