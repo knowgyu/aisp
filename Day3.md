@@ -1,6 +1,6 @@
 # Vision
 
-## Day1
+## Day3
 
 ### Intro
 - Evolution of Computer Vision
@@ -113,4 +113,68 @@ Pos embedding 도 알아서 잘 학습되더라, and Head들도 보면 layer가 
 > CNN은 kernel사이즈만 보면서 local하게 바라보면서 키워갔음. 물론 쌓여갈수록 넓은 영역을 바라보고는 있으나,
 > Attention과는 구조가 좀 다르고 attention은 처음부터 모든 구조를 봄.
 
+
+## Day4
+
+### Variants of ViT
+
+**DeiT**
+
+Distillation -> Student & Teacher 데이터셋 작은 경우 CNN이 더 잘하기에 Teacher = CNN
+
+-> Student Model의 input에 [CLS] 토큰과 더불어 distillation token을 추가하여 줌.
+
+Soft Distillation : student의 CE와 student&teacher간 KL Divergence의 가중합
+
+Hard Distillation : student의 CE와 student 확률분포,teacher의 정답간 CE를 평균
+(Hard Distillation이 대체로 더 성능이 좋음.)
+
+**Swin Transformer**
+
+patch가 고정 크기로만 하니, 분류는 괜찮으나 다른 상황에서 성능이 별로더라.
+-> Hierarchical하게 + Shifted windows(CNN때했던거) 를 잘 써보겠다.
+
+window로 해보니, window간에는 서로 attention을 안 함.
+-> Shifted된 window를 만들어서 그것에 대해서도 계산을 해봄. (각 윈도우간 경계부분들에 대한.)
+
+Cyclic shift -> masking -> reverse cyclic shift [03.Attention 32pg]
+
+**CLIP** (Contrastive Language-Image Pre-training)
+
+이미지와 텍스트를 Connecting. labeled dataset 비싸고, 어려움.
+
+N개의 Text, Image pair가 있을 때 둘 다 인코더 넣어서 d차원 벡터로 만든 후 matmul하여 NxN 만듦.
+-> I1*T1 = 1번 Image와 Text vector의 내적이고, 둘은 유사도가 높아야 함. (cosien similarity)
+-> 대각성분들의 값이 높음.
+
+Inference에서는 `A photo of a {object}`라고 집어넣고, image 넣으면 `A photo of a dog`라고 나와야 함.  
+-> 단순 label name이 아닌, natural caption style로. 
+
+**DINO** Emerging Properties in Self-Supervised Vision Transformers
+
+labelling 되지 않은 데이터이나, activation map을 보면 어느정도 object segmentations를 보임.
+
+DIstillation with NO labels -> DINO -> Student, Teacher framework
+
+Student는 Global views & Local views, Teacher는 Global views만.
+> Global View는 이미지에서 50% 이상 영역을 의미.
+
+Backbone은 layer 수 head 수 등 모두 동일한 ViT
+
+EMA (Exponential Moving Average) 
+![alt text](image-4.png)
+
+EMA는 급격하게 변하는 파라미터를 안정화시켜줌.(학생도 변하고 선생도 변하여 parameter 요동 큼)
+m은 대체로 매우 큰 값을 가지기에, teacher의 theta는 학생의 이전 값을 조금씩 참고하여 중심이 조금씩 변함.
+(sg는 stop gradient로, teacher는 softmax한 결과로 gradient 업데이트 X. EMA로만)
+
+Temperature도 다르게 사용. 학생은 0.1, 선생은 0.04로, teacher는 softmax 후 PMF가 sharp한 모양을 가지게 됨. 
+student는 비교적 높은 값을 활용하여 smoothing하였고, -> collapse를 avoid
+
+Output of ViT에 CLS token(384dim)이 있고 -> Logit vector(65,536)
+여기서의 Class = semantic cluster. 
+
+> Ch.3 까지 해선 Attention 매우 중요. 
+
+---
 
