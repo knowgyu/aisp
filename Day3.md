@@ -178,3 +178,108 @@ Output of ViT에 CLS token(384dim)이 있고 -> Logit vector(65,536)
 
 ---
 
+## Applications
+
+### Object Detection
+
+IoU, Recall, Precision, FR Curve, AP, mAP 등
+
+Object Detection은 크게 3가지로 분화됨. (1stage, 2stage, transformer)
+
+One stage : speed에 중점. 그냥 바로 추론
+Two stage : `Object proposal`을 두고 거기서 ㄱㄱ
+
+**Two Stage Algorithm** [R-CNN]
+
+Selective search 알고리즘으로 어디에 object가 있을 것 같은지 Object proposal을 줌.
+-> Selective search는 color, texture, size, spatial등의 유사도를 계산함.
+-> Hierarchical grouping. 이미지당 2천개정도 제안
+
+-> Warped image regions = 각자 다른 proposal들을 모두 같은 크기로 (227x227) 변환
+-> Warping된 영역에 대해 ConvNet 돌림. 
+
+
+위 방법대로 하면, 겹쳐지는 Bbox도 많을 것이며, Object가 아닌 것도 있을 것.
+-> Non-Maximum Suppression(NMS)로 Redundant boxes를 제거
+-> Confidence score 내림차순, IoU계산하여 많이 겹치면 제거 (threshold 지정)
+
+[Fast(er) R-CNN]
+
+R-CNN이 학습시간과 1개쿼리에 약 50초로 매우 느림.
+warping 연산 자체가 매우 느린데 2천개 다 하고, 2천개를 모두 각각 CNN을 통과시키며,또한 Selective Search가 CPU-bound.
+-> 차라리 input자체를 CNN에 한번 넣어 input size를 줄이고, 거기서부터 Region proposal하자. 여기서도 warping이 아닌 max-pooling 후 FCs넣어서 결과 산출
+기존 49초 -> 2.3초
+
+CPU-bound인건 해결하지 못해서(Region proposal) 이걸 해결한게 [Faster R-CNN]
+feature map 나온 거에서 Region Proposal Network 뽑음. CNN으로 또 Classification loss랑 Bbox Regression loss 구하는데,
+그럼 같은 CNN이 또 쓰이냐 하기엔, R-CNN의 결과는 multi class classification이지만, RPN은 Object인지 아닌지만 보는 Binary classification
+
+RPN에는 anchors가 나오는데, 하나의 포인트에 대해서 사전정의된 9개의 직사각형이 있음.  (모든 포인트를 다 찍진않고, 어느정도 stride는 있음. 논문에선 16)
+의도는 Object의 형상이 꼭 정사각형 아닐텐데, 이 9개 후보군으로 Object냐 아니냐를 조금 더 잘 볼 수 있음.
+영상크기가 800x600일 때, 800/16 * 600/16 = 1900개의 grid locations가 있고 그래서 anchors는 1900 * 9 = 17100개.
+
+RPN의 최종 결과는 binary classification(Object vs Background) 과 bounding Box regression(anchor box coordinate refinement)
+
+[CenterNet]
+
+two stage든 one stage든, 앵커박스 너무 많음. 하이퍼파라미터튜니암ㄶ이해야함. 복잡함. 
+-> Object일 것 같은 포인트잡기(anchor 없이.) 근데 오브젝트 가운데의 점을 잘 찾기. center heatmap, local offset, object size(w,h)를 추론.
+
+
+[DETR] 2020 
+End to End Object Detection with Transformers  
+> ViT는 2021. ViT보다 빨리 나옴.
+
+set prediction problem을 해겨해서 한번에 e2e로 풀어내겠다. NMS나 앵커같은거 안 쓰고.
+
+patch안하고 바로 input을 바로 CNN에 넣음. 그렇게 얻은 feature를 pos encoding이랑 같이 넣어 encoder -> decoder -> prediction heads에서 FFN으로해서 class box, 등등
+decoder에서 Object queries가 있음. 얘가 maximum으로 찾을 수 있는 Object 수 = Object queries 수. 즉, 1개의 Object Query당 1개의 Object 찾음.. 논문상에서는 4개로.
+
+-> 2개의 Object만 찾으면 진짜 no object라고 나옴. 
+
+IoU vs GIoU 
+IoU는 교집합이 없더라도, 아주 조금 벗어난거랑, 아주 멀리 떨어진거랑 똑같이 0임.
+GIoU는 이것을 좀 고려하겠다는 것. 우선, A, B 박스를 포함하는 큰 직사각형 만든 후(C) 이 전체영역(C)에서 A와 B 합친걸 뺌.
+GIoU = IoU - ( C - (A+B) ) / C. 즉, A,B를 아우르는 전체박스에서 비어있는 영역이 얼마나 많은가?를 봄. 빈 곳이 클수록(멀수록) GIoU 낮음.
+
+DETR에서 Encoder는 Obejct의 대략적인 위치를 알려주는 Attention map이 나오고, Decoder의 attention에서는 BBOX의 테두리정도가 잘 잡힘. (활성화됨)
+
+### Tracking
+
+[ByteTrack]
+
+기존 detect하다가 ID 놓치는 경우들 보니, 사람이 약간 부분적으로 보일 때 confidence가 낮아지면서 놓침. (Threshold아래로)
+-> Association이 놓침. 이 문제를 해결하기 위한 게 ByteTrack
+
+input으로는 Video sequence V, 디텍터 Det, detection score threshold t가 들어감.
+결과는Tracks T of the video.
+
+Detection했을 때 d.score가 t보다 크면 D high로, 낮으면 low로. (set에 넣음)
+이후 칼만필터 씌움
+(track하고있는 이전까지의 object 정보가 있을 때 현재 어디에 있는지?)
+
+![alt text](image-5.png)
+그림에서 predicted과 D_high의 교집합은 이미 있었고 잘 트래킹하는 것. Dhigh이지만 나머지애들은 새로 생긴 것.
+unmatched tracks는 가리거나 해서 잠깐 안 보이는 애들.(conf자체도없음 Det가 찾지못함. 가렸을듯 나갔거나)
+
+D_low와 Predicted 겹친 애들은 conf가 좀 낮아진 애. 부분적으로 보이거나 블러해진애들. 이런 애들을 잡아낸 (Survived tracks가 이 모델의 핵심)
+track 안했고, D_low에 있는 애들은 잘못잡은애.(background clutter) 근야 빼버리면 됨.
+
+Tracing에서 골치 중에도 Unmatched tracks. 기존에는 있었으나 Detector가 찾지도 못한 애는 어떡하지? 
+-> 몇초동안 기다리겠다.라는 느낌으로 보유하고있어야함. 얼마동안 기다려줄까?도 threshold.
+
+> 비슷한 형태의 사람이 사라진위치에서 다시 나오면 ID Switch할 수 있음. 이걸 잡기위해 appearnce까지 보는 게 SORT
+
+[TrackFormer]
+
+DETR과 동일함. 다른 점은 다음 이미지에서 이전 결과의 3개 쿼리(논문상 4개중3개잡힘)를 다음에 넣어주고, 그러고나서 또 추ㅏ적인 query들 남아있음. (아마 4개정도를 여유로 두게 잡아둔듯.)
+-> 만약 또 1개 더 생겨서 7개쿼리중 4개찾음. 그 다음에 4개를 건내줌. 
+-> 근데 만약 4개 중 1개를 놓치고 3개만 나왔다? 그럼 사라진 1개는 짧은 시간동안 갖고 유지.
+즉, DETR인데, 다음 시퀀스에 넘겨주는 게 차이.
+
+Track augmentation이라는 것도 나옴.
+
+03_DETR 실습은 13번까지만 나옴. 
+
+### Segmentation
+
