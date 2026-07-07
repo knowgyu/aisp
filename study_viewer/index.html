@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Study Notes</title>
+  <meta name="description" content="Language, Vision, On-Device AI study notes with Markdown, LaTeX, Mermaid, and slide images.">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="./styles.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true
+      },
+      svg: { fontCache: 'global' },
+      options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] }
+    };
+  </script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">AI</div>
+      <div>
+        <h1>AI Study Notes</h1>
+        <p>Markdown lecture viewer</p>
+      </div>
+    </div>
+
+    <label class="search-box" for="note-search">
+      <span>노트 검색</span>
+      <input id="note-search" type="search" placeholder="ODAI, attention, LoRA..." autocomplete="off">
+    </label>
+
+    <nav id="note-nav" class="toc" aria-label="강의 노트 목차"></nav>
+
+    <section class="side-note">
+      <h2>읽는 방법</h2>
+      <p>왼쪽에서 노트를 고르면 오른쪽에 Markdown 원문이 문서형으로 렌더링됩니다. 수식, Mermaid, PDF 추출 이미지를 함께 확인합니다.</p>
+    </section>
+  </aside>
+
+  <main class="doc-shell">
+    <header class="topbar">
+      <div>
+        <p id="note-section" class="eyebrow">Study Notes</p>
+        <h2 id="note-title">Loading...</h2>
+      </div>
+      <div class="top-actions">
+        <a id="raw-link" class="ghost-button" href="#" target="_blank" rel="noreferrer">Raw MD</a>
+      </div>
+    </header>
+
+    <article id="note-content" class="markdown-body" aria-live="polite">
+      <p class="loading">노트를 불러오는 중입니다.</p>
+    </article>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script src="./notes-manifest.js"></script>
+  <script src="./render.js"></script>
+</body>
+</html>
