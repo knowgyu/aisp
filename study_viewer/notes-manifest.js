@@ -12,6 +12,117 @@ window.AI_STUDY_NOTES = [
     "path": "study_notes/on_device_ai_study_plan.md"
   },
   {
+    "id": "study-notes-on-device-ai-odai1-ch01-on-device-ai-key-points",
+    "title": "ODAI-1 Chapter 1. On-Device AI 핵심 정리",
+    "section": "On-Device AI / Lecture",
+    "path": "study_notes/on_device_ai/odai1_ch01_on_device_ai_key_points.md"
+  },
+  {
+    "id": "study-notes-on-device-ai-odai1-ch02-network-pruning-key-points",
+    "title": "ODAI-1 Chapter 2. Network Pruning 핵심 정리",
+    "section": "On-Device AI / Lecture",
+    "path": "study_notes/on_device_ai/odai1_ch02_network_pruning_key_points.md"
+  },
+  {
+    "id": "study-notes-on-device-ai-odai1-ch03-quantization-key-points",
+    "title": "ODAI-1 Chapter 3. Quantization 핵심 정리",
+    "section": "On-Device AI / Lecture",
+    "path": "study_notes/on_device_ai/odai1_ch03_quantization_key_points.md"
+  },
+  {
+    "id": "study-notes-on-device-ai-odai1-ch04-knowledge-distillation-key-points",
+    "title": "ODAI-1 Chapter 4. Knowledge Distillation 핵심 정리",
+    "section": "On-Device AI / Lecture",
+    "path": "study_notes/on_device_ai/odai1_ch04_knowledge_distillation_key_points.md"
+  },
+  {
+    "id": "study-notes-on-device-ai-odai2-ch01-llm-pruning-peft-key-points",
+    "title": "ODAI-2 Chapter 1. LLM Pruning & Sparsity-Preserved PEFT 핵심 정리",
+    "section": "On-Device AI / Lecture",
+    "path": "study_notes/on_device_ai/odai2_ch01_llm_pruning_peft_key_points.md"
+  },
+  {
+    "id": "study-notes-on-device-ai-odai2-ch02-llm-quantization-key-points",
+    "title": "ODAI-2 Chapter 2. LLM Quantization 핵심 정리",
+    "section": "On-Device AI / Lecture",
+    "path": "study_notes/on_device_ai/odai2_ch02_llm_quantization_key_points.md"
+  },
+  {
+    "id": "study-notes-on-device-ai-odai2-ch03-efficient-inference-key-points",
+    "title": "ODAI-2 Chapter 3. Efficient Inference 핵심 정리",
+    "section": "On-Device AI / Lecture",
+    "path": "study_notes/on_device_ai/odai2_ch03_efficient_inference_key_points.md"
+  },
+  {
+    "id": "on-device-practice-01-pruning-cnn",
+    "kind": "notebook",
+    "title": "Practice 01. Pruning for CNN 코드 학습",
+    "section": "On-Device AI / Practice",
+    "path": "study_notes/on_device_ai/practice/01_pruning_cnn_practice_guide.md",
+    "notebookHtml": "notebooks/on_device_ai/01_pruning_cnn.html",
+    "sourceIpynb": "On-Device AI 강의자료/실습/1. Pruning for CNN.ipynb"
+  },
+  {
+    "id": "on-device-practice-02-quantization-cnn",
+    "kind": "notebook",
+    "title": "Practice 02. Quantization for CNN 코드 학습",
+    "section": "On-Device AI / Practice",
+    "path": "study_notes/on_device_ai/practice/02_quantization_cnn_practice_guide.md",
+    "notebookHtml": "notebooks/on_device_ai/02_quantization_cnn.html",
+    "sourceIpynb": "On-Device AI 강의자료/실습/2. Quantization for CNN.ipynb"
+  },
+  {
+    "id": "on-device-practice-03-knowledge-distillation",
+    "kind": "notebook",
+    "title": "Practice 03. Knowledge Distillation 코드 학습",
+    "section": "On-Device AI / Practice",
+    "path": "study_notes/on_device_ai/practice/03_knowledge_distillation_practice_guide.md",
+    "notebookHtml": "notebooks/on_device_ai/03_knowledge_distillation.html",
+    "sourceIpynb": "On-Device AI 강의자료/실습/3. Knowledge Distillation.ipynb"
+  },
+  {
+    "id": "on-device-practice-04-pruning-llm",
+    "kind": "notebook",
+    "title": "Practice 04. Pruning for LLM 코드 학습",
+    "section": "On-Device AI / Practice",
+    "path": "study_notes/on_device_ai/practice/04_pruning_llm_practice_guide.md",
+    "notebookHtml": "notebooks/on_device_ai/04_pruning_llm.html",
+    "sourceIpynb": "On-Device AI 강의자료/실습/4. Pruning for LLM.ipynb"
+  },
+  {
+    "id": "on-device-practice-05-quantization-llm",
+    "kind": "notebook",
+    "title": "Practice 05. Quantization for LLM 코드 학습",
+    "section": "On-Device AI / Practice",
+    "path": "study_notes/on_device_ai/practice/05_quantization_llm_practice_guide.md",
+    "notebookHtml": "notebooks/on_device_ai/05_quantization_llm.html",
+    "sourceIpynb": "On-Device AI 강의자료/실습/5. Quantization for LLM.ipynb"
+  },
+  {
+    "id": "study-notes-vision-01-resnet18-cifar10-deep-review",
+    "title": "Vision 01. ResNet18 + CIFAR-10 깊은 복습",
+    "section": "Vision",
+    "path": "study_notes/vision/01_resnet18_cifar10_deep_review.md"
+  },
+  {
+    "id": "study-notes-vision-02-vit-cifar10-deep-review",
+    "title": "Vision 02. Vision Transformer + CIFAR-10 깊은 복습",
+    "section": "Vision",
+    "path": "study_notes/vision/02_vit_cifar10_deep_review.md"
+  },
+  {
+    "id": "study-notes-vision-03-detr-deep-review",
+    "title": "Vision 03. DETR 깊은 복습",
+    "section": "Vision",
+    "path": "study_notes/vision/03_detr_deep_review.md"
+  },
+  {
+    "id": "study-notes-vision-04-unet-deep-review",
+    "title": "Vision 04. U-Net + Segmentation 깊은 복습",
+    "section": "Vision",
+    "path": "study_notes/vision/04_unet_deep_review.md"
+  },
+  {
     "id": "study-notes-language-01-vector-space-deep-review",
     "title": "LLM 01. Vector Space / Word Embedding 깊은 복습",
     "section": "Language / LLM",
@@ -54,99 +165,15 @@ window.AI_STUDY_NOTES = [
     "path": "study_notes/language/06_lora_finetuning_deep_review.md"
   },
   {
-    "id": "study-notes-language-07-dpo-deep-review",
-    "title": "LLM 07+. DPO 깊은 복습",
-    "section": "Language / LLM",
-    "path": "study_notes/language/07_dpo_deep_review.md"
-  },
-  {
     "id": "study-notes-language-07-instruction-finetuning-deep-review",
     "title": "LLM 07. Instruction Fine-tuning 깊은 복습",
     "section": "Language / LLM",
     "path": "study_notes/language/07_instruction_finetuning_deep_review.md"
   },
   {
-    "id": "study-notes-vision-01-resnet18-cifar10-deep-review",
-    "title": "01. ResNet18 + CIFAR-10 깊은 복습",
-    "section": "Vision",
-    "path": "study_notes/vision/01_resnet18_cifar10_deep_review.md"
-  },
-  {
-    "id": "study-notes-vision-02-vit-cifar10-deep-review",
-    "title": "02. Vision Transformer + CIFAR-10 깊은 복습",
-    "section": "Vision",
-    "path": "study_notes/vision/02_vit_cifar10_deep_review.md"
-  },
-  {
-    "id": "study-notes-vision-03-detr-deep-review",
-    "title": "03. DETR 깊은 복습",
-    "section": "Vision",
-    "path": "study_notes/vision/03_detr_deep_review.md"
-  },
-  {
-    "id": "study-notes-vision-04-unet-deep-review",
-    "title": "04. U-Net + Segmentation 깊은 복습",
-    "section": "Vision",
-    "path": "study_notes/vision/04_unet_deep_review.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-ch01-pdf-extracted-text",
-    "title": "Chapter 1 PDF Extracted Text",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/ch01_pdf_extracted_text.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-01-cnn-pruning-deep-review",
-    "title": "Chapter 1. Pruning for CNN",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/01_cnn_pruning_deep_review.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-ch01-lecture-pack",
-    "title": "Chapter 1 Lecture Pack — Pruning for CNN",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/ch01_lecture_pack.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-odai1-ch01-on-device-ai-key-points",
-    "title": "ODAI-1 Chapter 1. On-Device AI 핵심 정리",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/odai1_ch01_on_device_ai_key_points.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-odai1-ch02-network-pruning-key-points",
-    "title": "ODAI-1 Chapter 2. Network Pruning 핵심 정리",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/odai1_ch02_network_pruning_key_points.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-odai1-ch03-quantization-key-points",
-    "title": "ODAI-1 Chapter 3. Quantization 핵심 정리",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/odai1_ch03_quantization_key_points.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-odai1-ch04-knowledge-distillation-key-points",
-    "title": "ODAI-1 Chapter 4. Knowledge Distillation 핵심 정리",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/odai1_ch04_knowledge_distillation_key_points.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-odai2-ch01-llm-pruning-peft-key-points",
-    "title": "ODAI-2 Chapter 1. LLM Pruning & Sparsity-Preserved PEFT 핵심 정리",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/odai2_ch01_llm_pruning_peft_key_points.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-odai2-ch02-llm-quantization-key-points",
-    "title": "ODAI-2 Chapter 2. LLM Quantization 핵심 정리",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/odai2_ch02_llm_quantization_key_points.md"
-  },
-  {
-    "id": "study-notes-on-device-ai-odai2-ch03-efficient-inference-key-points",
-    "title": "ODAI-2 Chapter 3. Efficient Inference 핵심 정리",
-    "section": "On-Device AI",
-    "path": "study_notes/on_device_ai/odai2_ch03_efficient_inference_key_points.md"
+    "id": "study-notes-language-07-dpo-deep-review",
+    "title": "LLM 07+. DPO 깊은 복습 (Optional)",
+    "section": "Language / LLM / Optional",
+    "path": "study_notes/language/07_dpo_deep_review.md"
   }
 ];

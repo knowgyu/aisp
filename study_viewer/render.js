@@ -6,6 +6,7 @@
   const section = document.querySelector('#note-section');
   const rawLink = document.querySelector('#raw-link');
   const search = document.querySelector('#note-search');
+  const sideNote = document.querySelector('.side-note p');
   const validIds = new Set(notes.map((note) => note.id));
 
   if (window.mermaid) {
@@ -50,7 +51,7 @@
   function groupNotes(filterText) {
     const query = String(filterText || '').trim().toLowerCase();
     const filtered = query
-      ? notes.filter((note) => `${note.section} ${note.title} ${note.path}`.toLowerCase().includes(query))
+      ? notes.filter((note) => `${note.section} ${note.title} ${note.path} ${note.sourceIpynb || ''}`.toLowerCase().includes(query))
       : notes;
     return filtered.reduce((groups, note) => {
       if (!groups.has(note.section)) groups.set(note.section, []);
@@ -60,50 +61,45 @@
   }
 
   function renderNav(activeId) {
-    if (!nav) return;
-    const groups = groupNotes(search && search.value);
+    const groups = groupNotes(search.value);
     nav.innerHTML = Array.from(groups.entries()).map(([group, items]) => `
       <section class="nav-group">
         <h3>${escapeHtml(group)}</h3>
         ${items.map((note) => `
-          <a href="#${encodeURIComponent(note.id)}" class="${note.id === activeId ? 'active' : ''}" data-note-id="${escapeHtml(note.id)}" aria-current="${note.id === activeId ? 'page' : 'false'}">
+          <a href="#${encodeURIComponent(note.id)}" class="${note.id === activeId ? 'active' : ''} ${note.kind === 'notebook' ? 'notebook-link' : ''}" data-note-id="${escapeHtml(note.id)}" aria-current="${note.id === activeId ? 'page' : 'false'}">
             <span>${escapeHtml(note.title)}</span>
-            <small>${escapeHtml(note.path.replace(/^study_notes\//, ''))}</small>
+            <small>${note.kind === 'notebook' ? 'Notebook + Guide' : escapeHtml(note.path.replace(/^study_notes\//, ''))}</small>
           </a>
         `).join('')}
       </section>
     `).join('') || '<p class="empty-nav">검색 결과가 없습니다.</p>';
   }
 
-  function dirname(path) {
+  function baseDirOf(path) {
     const index = path.lastIndexOf('/');
     return index >= 0 ? path.slice(0, index + 1) : '';
   }
 
   function isExternal(url) {
-    return /^(https?:|mailto:|tel:|data:|#)/i.test(url || '');
+    return /^(https?:|mailto:|tel:|data:|#)/i.test(url) || url.startsWith('/');
   }
 
   function normalizeRelativeUrl(url, baseDir) {
-    if (!url || isExternal(url)) return url;
-    if (url.startsWith('/')) return url;
-    const [path, hash] = url.split('#');
-    const [cleanPath, query] = path.split('?');
+    const [cleanPath, suffix = ''] = url.split(/(?=[?#])/);
     const stack = baseDir.split('/').filter(Boolean);
     for (const part of cleanPath.split('/')) {
       if (!part || part === '.') continue;
       if (part === '..') stack.pop();
       else stack.push(part);
     }
-    const normalized = stack.join('/');
-    return `${normalized}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`;
+    return `${stack.join('/')}${suffix}`;
   }
 
-  function rewriteRelativeMarkdown(markdown, notePath) {
-    const baseDir = dirname(notePath);
+  function rewriteRelativeUrls(markdown, notePath) {
+    const baseDir = baseDirOf(notePath);
     const replaceUrl = (full, prefix, url, suffix) => {
       const trimmed = url.trim();
-      if (!trimmed || trimmed.startsWith('<')) return full;
+      if (!trimmed || trimmed.startsWith('<') || isExternal(trimmed)) return full;
       return `${prefix}${normalizeRelativeUrl(trimmed, baseDir)}${suffix}`;
     };
     return markdown
@@ -115,97 +111,106 @@
   }
 
   function markdownToHtml(markdown) {
-    if (!window.marked) {
-      return `<pre>${escapeHtml(markdown)}</pre>`;
-    }
-    window.marked.setOptions({
-      gfm: true,
-      breaks: false,
-      mangle: false,
-      headerIds: true
-    });
+    if (!window.marked) return `<pre>${escapeHtml(markdown)}</pre>`;
+    window.marked.setOptions({ gfm: true, breaks: false, mangle: false, headerIds: true });
     const raw = window.marked.parse(markdown);
     return window.DOMPurify ? window.DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] }) : raw;
   }
 
-  function enhanceRenderedContent(note) {
-    panel.querySelectorAll('a[href]').forEach((link) => {
+  function enhanceRenderedContent(root, note) {
+    root.querySelectorAll('a[href]').forEach((link) => {
       const href = link.getAttribute('href');
       if (/^https?:/i.test(href)) {
         link.target = '_blank';
         link.rel = 'noreferrer';
       }
     });
-
-    panel.querySelectorAll('pre code.language-mermaid').forEach((code, index) => {
+    root.querySelectorAll('pre code.language-mermaid').forEach((code, index) => {
       const wrapper = document.createElement('div');
       wrapper.className = 'mermaid';
       wrapper.id = `mermaid-${note.id}-${index}`;
       wrapper.textContent = code.textContent;
       code.closest('pre').replaceWith(wrapper);
     });
-
-    panel.querySelectorAll('img').forEach((img) => {
+    root.querySelectorAll('img').forEach((img) => {
       img.loading = 'lazy';
       img.decoding = 'async';
     });
-
     if (window.mermaid) {
-      window.mermaid.run({ nodes: panel.querySelectorAll('.mermaid') }).catch((error) => {
-        console.warn('Mermaid render failed', error);
-      });
+      window.mermaid.run({ nodes: root.querySelectorAll('.mermaid') }).catch((error) => console.warn('Mermaid render failed', error));
     }
-
     if (window.MathJax && window.MathJax.typesetPromise) {
-      window.MathJax.typesetPromise([panel]).catch((error) => {
-        console.warn('MathJax render failed', error);
-      });
+      window.MathJax.typesetPromise([root]).catch((error) => console.warn('MathJax render failed', error));
     }
   }
 
-  async function renderNote(id, pushHash) {
-    const note = noteById(id);
-    if (!note) return;
+  async function loadMarkdown(note) {
+    const response = await fetch(note.path, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    return rewriteRelativeUrls(await response.text(), note.path);
+  }
+
+  function setChrome(note) {
     renderNav(note.id);
-    if (pushHash && window.location.hash !== `#${note.id}`) {
-      history.pushState(null, '', `#${note.id}`);
-    }
+    if (window.location.hash !== `#${note.id}`) history.pushState(null, '', `#${note.id}`);
     title.textContent = note.title;
     section.textContent = note.section;
     rawLink.href = note.path;
-    panel.innerHTML = '<p class="loading">노트를 불러오는 중입니다.</p>';
+    rawLink.textContent = note.kind === 'notebook' ? 'Guide MD' : 'Raw MD';
+    if (sideNote) {
+      sideNote.textContent = note.kind === 'notebook'
+        ? '실습 페이지는 왼쪽 설명과 오른쪽 원본 노트북 HTML을 동시에 보여줍니다. 노트북은 sandboxed iframe으로 격리됩니다.'
+        : '왼쪽에서 노트를 고르면 오른쪽에 Markdown 원문이 문서형으로 렌더링됩니다. 수식, Mermaid, 이미지를 함께 확인합니다.';
+    }
+  }
 
+  async function renderNote(id) {
+    const note = noteById(id);
+    if (!note) return;
+    setChrome(note);
+    panel.className = note.kind === 'notebook' ? 'note-content notebook-content' : 'note-content markdown-body';
+    panel.innerHTML = '<p class="loading">노트를 불러오는 중입니다.</p>';
     try {
-      const response = await fetch(note.path, { cache: 'no-cache' });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      const markdown = rewriteRelativeMarkdown(await response.text(), note.path);
-      panel.innerHTML = markdownToHtml(markdown);
-      enhanceRenderedContent(note);
+      const markdown = await loadMarkdown(note);
+      const guideHtml = markdownToHtml(markdown);
+      if (note.kind === 'notebook') {
+        panel.innerHTML = `
+          <div class="notebook-layout" data-note-kind="notebook">
+            <section class="notebook-guide markdown-body" aria-label="Curated notebook guide">${guideHtml}</section>
+            <aside class="notebook-frame-panel" aria-label="Original notebook HTML">
+              <div class="notebook-frame-head">
+                <strong>Original Notebook HTML</strong>
+                <a href="${escapeHtml(note.notebookHtml)}" target="_blank" rel="noreferrer">새 탭</a>
+              </div>
+              <iframe class="notebook-iframe" title="${escapeHtml(note.title)} 원본 노트북 HTML" src="${escapeHtml(note.notebookHtml)}" sandbox="" loading="lazy"></iframe>
+            </aside>
+          </div>
+        `;
+      } else {
+        panel.innerHTML = guideHtml;
+      }
+      enhanceRenderedContent(panel, note);
       document.title = `${note.title} · AI Study Notes`;
     } catch (error) {
+      panel.className = 'note-content markdown-body';
       panel.innerHTML = `
         <section class="error-card">
           <h1>노트를 불러오지 못했습니다.</h1>
           <p>${escapeHtml(error.message)}</p>
-          <p>로컬에서 볼 때는 <code>python3 -m http.server</code>로 정적 서버를 띄워야 fetch가 정상 동작합니다.</p>
+          <p>로컬에서는 <code>python3 -m http.server --directory study_viewer</code>로 실행해야 fetch가 동작합니다.</p>
         </section>
       `;
     }
   }
 
-  if (nav) {
-    nav.addEventListener('click', (event) => {
-      const link = event.target.closest('a[data-note-id]');
-      if (!link) return;
-      event.preventDefault();
-      renderNote(link.dataset.noteId, true);
-    });
-  }
-
-  if (search) {
-    search.addEventListener('input', () => renderNav(normalizeHash()));
-  }
-
-  window.addEventListener('hashchange', () => renderNote(normalizeHash(), false));
-  renderNote(normalizeHash(), false);
+  nav.addEventListener('click', (event) => {
+    const link = event.target.closest('a[data-note-id]');
+    if (!link) return;
+    event.preventDefault();
+    renderNote(link.dataset.noteId);
+  });
+  search.addEventListener('input', () => renderNav(normalizeHash()));
+  window.addEventListener('hashchange', () => renderNote(normalizeHash()));
+  renderNav(normalizeHash());
+  renderNote(normalizeHash());
 })();

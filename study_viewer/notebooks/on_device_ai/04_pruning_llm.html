@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assignment 4. Pruning for LLM</title>
+  <style>
+    :root { color-scheme: light; --bg:#f8fafc; --paper:#ffffff; --ink:#17202a; --muted:#5c6b7a; --line:#d9e2ec; --code:#0f172a; --code-ink:#d9f3ff; --accent:#2563eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif; line-height:1.68; font-size:16px; }
+    .nb-wrap { max-width:1080px; margin:0 auto; padding:28px 24px 72px; }
+    .nb-title { margin:0 0 6px; font-size:30px; letter-spacing:-0.03em; }
+    .nb-source { color:var(--muted); font-size:13px; margin:0 0 24px; word-break:break-all; }
+    .nb-cell { background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:16px 0; box-shadow:0 8px 22px rgba(15,23,42,.05); overflow:auto; }
+    .nb-markdown h1 { font-size:28px; } .nb-markdown h2 { font-size:23px; border-bottom:1px solid var(--line); padding-bottom:8px; } .nb-markdown h3 { font-size:19px; }
+    .nb-markdown h1,.nb-markdown h2,.nb-markdown h3,.nb-markdown h4 { letter-spacing:-0.025em; line-height:1.25; }
+    .nb-markdown table, .nb-output table { border-collapse:collapse; width:max-content; max-width:100%; margin:12px 0; }
+    th,td { border:1px solid var(--line); padding:8px 10px; vertical-align:top; } th { background:#eef4ff; }
+    pre { white-space:pre-wrap; overflow:auto; }
+    .nb-code-head { color:var(--accent); font-weight:800; margin-bottom:8px; font-size:13px; }
+    .nb-code { background:var(--code); color:var(--code-ink); border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.58; }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace; }
+    .nb-output { margin-top:12px; border-left:4px solid #93c5fd; background:#f1f7ff; border-radius:10px; padding:10px 12px; }
+    .nb-error { border-left-color:#ef4444; background:#fff1f2; }
+    .nb-image img, .nb-markdown img, .nb-html img { max-width:100%; height:auto; display:block; }
+    a { color:#1d4ed8; }
+  </style>
+</head>
+<body>
+  <main class="nb-wrap">
+    <h1 class="nb-title">Assignment 4. Pruning for LLM</h1>
+    <p class="nb-source">Source notebook: On-Device AI 강의자료/실습/4. Pruning for LLM.ipynb</p>
+    <section class="nb-cell nb-markdown" data-cell="1"><h1>Assignment 4. Pruning for LLM</h1></section><section class="nb-cell nb-markdown" data-cell="2"><h2>Goals</h2>
+<p>본 실습에서는 대규모 언어 모델(Large Language Model, LLM)의 크기를 효과적으로 줄이는 Pruning 기법을 학습합니다. 특히 Magnitude-based pruning과 최근 주목받는 Wanda 기법을 활용하여, 파라미터의 수를 효율적으로 감소시키면서 모델의 성능을 유지하는 방법을 실습합니다.</p>
+<h2>Contents</h2>
+<ul><li><strong>Magnitude-based Pruning 실습</strong>:</li><li>간단한 magnitude 기반 pruning 방법을 통해 모델 크기를 감소시키고 성능 변화를 확인합니다.</li><li><strong>Wanda를 이용한 Pruning 실습</strong>:</li><li>Activation의 중요도를 측정하여 더 정교하게 pruning을 수행하는 Wanda 방법을 구현하고 모델의 성능을 비교합니다.</li></ul></section><section class="nb-cell nb-markdown" data-cell="3"><h2>Setup</h2></section><section class="nb-cell nb-markdown" data-cell="4"><p>필요한 모듈을 불러옵니다.</p></section><section class="nb-cell nb-code" data-cell="5"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>import tqdm
+import torch
+from torch import nn
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from datasets import load_dataset
+from functools import partial
+import gc
+import os</code></pre></section><section class="nb-cell nb-markdown" data-cell="6"><h3>모델 평가</h3>
+<p>Wikitext-2 데이터셋을 사용하여 모델의 성능을 평가하는 지표인 perplexity를 계산합니다.</p>
+<p><strong>Perplexity란?</strong></p>
+<ul><li>Perplexity는 언어 모델이 주어진 텍스트를 얼마나 잘 예측하는지를 수치로 나타낸 지표입니다.</li><li>수학적으로는 모델이 예측한 확률분포의 &quot;불확실성&quot;을 측정하는 값이며, 값이 <strong>낮을수록 모델의 성능이 좋다</strong>고 해석합니다.</li><li>단어 $\{w_1, w_2, w_3, ..., w_N\}$으로 구성된 문장의 Perplexity는 다음과 같은 수식으로 나타낼 수 있습니다.</li><li>$Perplexity = \sqrt[N]{\frac{1}{\prod_{i=1}^{N} P(w_i | w_1, w_2, ..., w_{i-1})}}$</li><li>여기서 $P(w_i | w_1, w_2, ..., w_{i-1})$은 $i$번째에 $w_i$ 단어를 생성할 확률을 의미합니다.</li><li>즉, Perplexity는 문자의 발생 확률에 대한 역수를 의미하게 됩니다.</li><li>직관적으로 Perplexity가 10이라면 모델이 다음 단어 후보를 10개 정도로 생각하고 있다고 볼 수 있습니다.</li></ul></section><section class="nb-cell nb-code" data-cell="7"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>def evaluate(model, tokenizer):
+    &quot;&quot;&quot;
+    모델의 perplexity를 계산하는 함수입니다.
+
+    Args:
+        model: 평가할 모델
+        tokenizer: 토크나이저
+
+    Returns:
+        float: 계산된 perplexity 값
+    &quot;&quot;&quot;
+    # 테스트 데이터셋 로드 및 전처리
+    testenc = load_dataset(&#x27;Salesforce/wikitext&#x27;, &#x27;wikitext-2-raw-v1&#x27;, split=&#x27;test&#x27;)
+    testenc = tokenizer(&quot;\n\n&quot;.join(testenc[&#x27;text&#x27;]), return_tensors=&#x27;pt&#x27;)
+
+    # 입력 데이터를 모델 디바이스로 이동
+    testenc = testenc.input_ids.to(model.device)
+    nsamples = 40
+    model = model.eval()  # 평가 모드로 설정
+
+    # Negative log likelihood 계산
+    nlls = []
+    for i in tqdm.tqdm(range(nsamples), desc=&quot;evaluating...&quot;):
+        # 배치 데이터 준비
+        batch = testenc[:, (i * 2048):((i + 1) * 2048)].to(model.device)
+
+        # 모델 추론
+        with torch.no_grad():
+            lm_logits = model(batch).logits
+
+        # 로짓과 레이블 시프트
+        shift_logits = lm_logits[:, :-1, :].contiguous().float()
+        shift_labels = testenc[:, (i * 2048):((i + 1) * 2048)][:, 1:]
+
+        # 손실 계산
+        loss_fct = nn.CrossEntropyLoss()
+        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        neg_log_likelihood = loss.float() * 2048
+        nlls.append(neg_log_likelihood)
+
+    # Perplexity 계산 및 반환
+    return torch.exp(torch.stack(nlls).sum() / (nsamples * 2048))</code></pre></section><section class="nb-cell nb-markdown" data-cell="8"><h3>SmolLM-135M 모델 로딩</h3>
+<p>SmolLM-135M 모델을 로딩하고 평가합니다. 여기서 tokenizer는 텍스트(문장)를 모델이 이해할 수 있는 작은 단위(token)로 나누는 역할을 수행합니다.</p></section><section class="nb-cell nb-code" data-cell="9"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>model_path = &quot;HuggingFaceTB/SmolLM-135M&quot;
+os.environ[&quot;HF_HOME&quot;] = &quot;D:\\data\\hf_cache&quot;
+tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+model = AutoModelForCausalLM.from_pretrained(model_path, device_map=&quot;auto&quot;, torch_dtype=torch.float16, use_safetensors=True)
+
+# Evaluate the model
+model_perplexity = evaluate(model, tokenizer)
+print(f&quot;\nmodel perplexity: {model_perplexity:.2f}&quot;)</code></pre></section><section class="nb-cell nb-markdown" data-cell="10"><h2>[실습 1] Magnitude-based Pruning 구현</h2>
+<p>Magnitude-based pruning 함수를 구현하세요. 구현은 CNN에서 magnitude-based pruning을 구현하는 방식과 유사합니다.</p></section><section class="nb-cell nb-code" data-cell="11"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>@torch.no_grad()
+def prune_magnitude(model, sparsity):
+    for n, m in model.named_modules():
+        if isinstance(m, nn.Linear) and &quot;lm_head&quot; not in n:
+            W = m.weight.data
+            ##################### YOUR CODE STARTS HERE #####################
+            num_elements = 
+            num_zeros = 
+            importance = 
+            threshold = 
+            mask = 
+            ##################### YOUR CODE ENDS HERE #######################
+            W.mul_(mask)</code></pre></section><section class="nb-cell nb-markdown" data-cell="12"><p>Pruning된 모델을 평가합니다.</p></section><section class="nb-cell nb-code" data-cell="13"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>gc.collect()
+torch.cuda.empty_cache()
+model = AutoModelForCausalLM.from_pretrained(model_path, device_map=&quot;auto&quot;, torch_dtype=torch.float16, use_safetensors=True)
+prune_magnitude(model, 0.5)
+
+# Evaluate the model
+model_perplexity = evaluate(model, tokenizer)
+print(f&quot;\nmodel perplexity (magnitude 50%): {model_perplexity:.2f}&quot;)</code></pre></section><section class="nb-cell nb-markdown" data-cell="14"><h2>[실습 2] Calibration 데이터셋 준비</h2>
+<p><a href="https://arxiv.org/pdf/2306.11695" rel="noreferrer">Wanda</a>를 사용하여 importance를 계산하기 위해서는 calibration 데이터셋을 통해 activation을 추출해야 합니다.</p>
+<p>이를 위해 ``<code>get_calib_dataset</code>`` 함수는 calibration dataset을 준비합니다.</p></section><section class="nb-cell nb-code" data-cell="15"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>def get_calib_dataset(tokenizer=None, n_samples=256, block_size=512):
+    dataset = load_dataset(&quot;mit-han-lab/pile-val-backup&quot;, split=&quot;validation&quot;)
+    dataset = dataset.shuffle(seed=42)
+    samples = []
+    n_run = 0
+    for data in dataset:
+        line = data[&quot;text&quot;]
+        line = line.strip()
+        line_encoded = tokenizer.encode(line)
+        if len(line_encoded) &gt; block_size:
+            continue
+        sample = torch.tensor([line_encoded])
+        if sample.numel() == 0:
+            continue
+        samples.append(sample)
+        n_run += 1
+        if n_run == n_samples:
+            break
+
+    # now concatenate all samples and split according to block size
+    cat_samples = torch.cat(samples, dim=1)
+    n_split = cat_samples.shape[1] // block_size
+    print(f&quot; * Split into {n_split} blocks&quot;)
+    return [cat_samples[:, i*block_size:(i+1)*block_size] for i in range(n_split)]
+
+samples = get_calib_dataset(tokenizer)</code></pre></section><section class="nb-cell nb-markdown" data-cell="16"><p>아래 빈칸을 작성하여 <code>activation_norm</code>을 계산하세요. Wanda 기법에서는 <code>activation_norm</code>을 L2 norm으로 계산하지만, 구현에서는 calibration 데이터셋에 대해 여러 번 반복하여 누적하므로 <code>activation_norm</code> 계산 시 제곱을 적용한 형태로 누적합니다. (이후 값을 사용할 때는 제곱근을 적용해야 합니다.)</p></section><section class="nb-cell nb-code" data-cell="17"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>@torch.no_grad()
+def get_calib_feat(model, tokenizer, samples):
+    input_dict = dict()
+    nsamples_dict = dict()
+    def add_batch(m, x, y, name):
+        if name not in input_dict:
+            input_dict[name] = torch.zeros((m.weight.data.shape[1]), device=m.weight.data.device)
+            nsamples_dict[name] = 0
+
+        if isinstance(x, tuple):
+            x = x[0]
+
+        if len(x.shape) == 2:
+            x = x.unsqueeze(0)
+        tmp = x.shape[0]
+        if len(x.shape) == 3:
+            x = x.reshape((-1, x.shape[-1]))
+        x = x.t()
+
+        input_dict[name] *= nsamples_dict[name] / (nsamples_dict[name] + tmp)
+        nsamples_dict[name] += tmp
+
+        x = x.type(torch.float32)
+        ##################### YOUR CODE STARTS HERE #####################
+        # activation_norm을 계산하세요.
+        # x.shape =&gt; (hidden_size, batch_size)
+        activation_norm = 
+        # activation_norm.shape =&gt; (hidden_size)
+        ##################### YOUR CODE ENDS HERE #######################
+        input_dict[name] += activation_norm / nsamples_dict[name]
+
+    hooks = []
+    for name, m in model.named_modules():
+        if isinstance(m, nn.Linear) and &quot;lm_head&quot; not in name:
+            hooks.append(
+                m.register_forward_hook(
+                    partial(add_batch, name=name)))
+
+    print(&quot;Collecting norm of input activations...&quot;)
+    device = torch.device(&quot;cuda&quot; if torch.cuda.is_available() else &quot;cpu&quot;)
+
+    pbar = tqdm.tqdm(samples)
+    for input_ids in pbar:
+        input_ids = input_ids.to(device)
+        model(input_ids)
+
+    for key in input_dict.keys():
+        input_dict[key].sqrt_()
+
+    for hook in hooks:
+        hook.remove()
+    return input_dict</code></pre></section><section class="nb-cell nb-code" data-cell="18"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>gc.collect()
+torch.cuda.empty_cache()
+model = AutoModelForCausalLM.from_pretrained(model_path, device_map=&quot;auto&quot;, torch_dtype=torch.float16, use_safetensors=True)
+input_feat = get_calib_feat(model, tokenizer, samples)</code></pre></section><section class="nb-cell nb-markdown" data-cell="19"><h2>[실습 3] Wanda Pruning 구현</h2>
+<p>Wanda 논문을 참고하여 아래 빈 칸을 채워 Wanda Pruning을 구현하고 실행해보세요.</p>
+<p>Wanda에서는 일반적인 magnitude-based pruning 방법과 다르게게 weight parameter의 행(row)별로 동일한 희소성(sparsity)으로 pruning을 진행합니다.</p></section><section class="nb-cell nb-code" data-cell="20"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>@torch.no_grad()
+def prune_wanda(model, sparsity, input_feat):
+    for n, m in model.named_modules():
+        if isinstance(m, nn.Linear) and &quot;lm_head&quot; not in n:
+            W = m.weight.data
+            ##################### YOUR CODE STARTS HERE #####################
+            row, col = 
+            num_zeros_per_row = 
+            importance = 
+            threshold = 
+            mask = 
+            ##################### YOUR CODE ENDS HERE #######################
+            W.mul_(mask)</code></pre></section><section class="nb-cell nb-code" data-cell="21"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code>gc.collect()
+torch.cuda.empty_cache()
+model = AutoModelForCausalLM.from_pretrained(model_path, device_map=&quot;auto&quot;, torch_dtype=torch.float16, use_safetensors=True)
+prune_wanda(model, sparsity=0.5, input_feat=input_feat)
+
+# Evaluate the model
+model_perplexity = evaluate(model, tokenizer)
+print(f&quot;\nmodel perplexity (wanda 50%): {model_perplexity:.2f}&quot;)</code></pre></section>
+  </main>
+</body>
+</html>
