@@ -45,3 +45,38 @@ softmax때문에 fp32연산이 필요함. (int로는 안되니) -> GELU나 그�
 But, powerful한건 Simulated quantization 중, QK Matmul은 하고나서 Softmx가기전에 dequant, quantize 하고 QV Matmul
 (NPU같은 곳에서는 이런거 많이 씀.)
 
+## Distillation
+
+pg95. Forward (mode-covering. CNN) & Reverse (mode-seeking. LLM)
+CNN은 Class가 많지 않으나, LLM은 vocab_size가 크기에 forward를 쓰면 어중간한 답이 나오는데, reverse할 경우가 더 적절함.
+(하나만 쓰기보다, 둘 다 쓰는 JS Divergence도 있음.)
+
+## Post-Training Quantization(PTQ)
+
+![alt text](image-7.png)
+
+Weight만 Q할것인가, Activation도 같이 Quantization할 것인가?
+and, Activation은 Outlier가 많은데, 이건 어떻게 핵려할지?
+
+**SmoothQuant**
+
+Activation은 Outlier가 많아 quantize하기 힘듦.
+-> WA니깐 W에는 Scale을 곱해주고, A에는 Scale로 나눔.
+-> Activation을 S로 나눠 Smoothing되어 quantize하기 쉬워짐.
+-> Weight는 S로 곱해 뾰족해졌으나, 원래 좀 균등해서 어렵지 않음.
+
+-> Activation의 quantize 난이도가 weight쪽으로 넘어갔다
+
+
+Weight-Only Quantization
+
+W8A8까지는 Activation 내려도 정확도 괜찮은데, 그 밑에까지 하니 정확도가 깨짐.
+근데 메모리에 올라가는 거 보면 Weight의 비중이 훨씬 큼.
+Weight만 4bit로, Activation은 16bit로 두면 연산자체야 weight도 다시 16비트로 올려서 연산해야하기에
+연산속도 이점은 적으나, 메모리 트래픽이 줄어들어 효과가 좋음.
+-> W4A16. GPTQ ran OPT-175B를 A100 1대애ㅔ.
+
+RTN = Rounding to Nearest. 단순 PTQ (baseline느낌)
+
+
+
