@@ -115,9 +115,116 @@
 
   function markdownToHtml(markdown) {
     if (!window.marked) return `<pre>${escapeHtml(markdown)}</pre>`;
+    const protectedMath = protectMarkdownMath(markdown);
     window.marked.setOptions({ gfm: true, breaks: false, mangle: false, headerIds: true });
-    const raw = window.marked.parse(markdown);
-    return window.DOMPurify ? window.DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] }) : raw;
+    const raw = window.marked.parse(protectedMath.markdown);
+    const safe = window.DOMPurify ? window.DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] }) : raw;
+    return protectedMath.restore(safe);
+  }
+
+  function isEscaped(text, index) {
+    let slashCount = 0;
+    for (let back = index - 1; back >= 0 && text[back] === '\\'; back -= 1) slashCount += 1;
+    return slashCount % 2 === 1;
+  }
+
+  function findClosingDelimiter(text, start, delimiter) {
+    for (let index = start; index < text.length; index += 1) {
+      if (text.startsWith(delimiter, index) && !isEscaped(text, index)) return index;
+    }
+    return -1;
+  }
+
+  function copyUntilLineEnd(text, start) {
+    const end = text.indexOf('\n', start);
+    return end < 0 ? text.length : end + 1;
+  }
+
+  function protectMarkdownMath(markdown) {
+    const tokens = [];
+    const makeToken = (value) => {
+      const token = `@@AISP_MATH_${tokens.length}@@`;
+      tokens.push({ token, value });
+      return token;
+    };
+
+    let output = '';
+    let index = 0;
+    let lineStart = true;
+    let fence = '';
+    while (index < markdown.length) {
+      if (lineStart && (markdown.startsWith('```', index) || markdown.startsWith('~~~', index))) {
+        const marker = markdown.slice(index, index + 3);
+        if (!fence) fence = marker;
+        else if (marker === fence) fence = '';
+        const end = copyUntilLineEnd(markdown, index);
+        output += markdown.slice(index, end);
+        index = end;
+        lineStart = true;
+        continue;
+      }
+
+      if (fence) {
+        output += markdown[index];
+        lineStart = markdown[index] === '\n';
+        index += 1;
+        continue;
+      }
+
+      if (markdown[index] === '`') {
+        const match = markdown.slice(index).match(/^`+/);
+        const delimiter = match[0];
+        const end = markdown.indexOf(delimiter, index + delimiter.length);
+        if (end >= 0) {
+          const next = end + delimiter.length;
+          output += markdown.slice(index, next);
+          lineStart = /\n$/.test(output);
+          index = next;
+          continue;
+        }
+      }
+
+      const candidates = [
+        ['$$', '$$'],
+        ['\\[', '\\]'],
+        ['\\(', '\\)']
+      ];
+      let protectedSegment = false;
+      for (const [open, close] of candidates) {
+        if (!markdown.startsWith(open, index)) continue;
+        const start = index + open.length;
+        const end = findClosingDelimiter(markdown, start, close);
+        if (end < 0) continue;
+        const next = end + close.length;
+        output += makeToken(markdown.slice(index, next));
+        index = next;
+        lineStart = false;
+        protectedSegment = true;
+        break;
+      }
+      if (protectedSegment) continue;
+
+      if (markdown[index] === '$' && markdown[index + 1] !== '$' && !isEscaped(markdown, index)) {
+        const end = findClosingDelimiter(markdown, index + 1, '$');
+        if (end >= 0) {
+          output += makeToken(markdown.slice(index, end + 1));
+          index = end + 1;
+          lineStart = false;
+          continue;
+        }
+      }
+
+      output += markdown[index];
+      lineStart = markdown[index] === '\n';
+      index += 1;
+    }
+
+    return {
+      markdown: output,
+      restore(html) {
+        return tokens.reduce((result, item) => result.replaceAll(item.token, escapeHtml(item.value)), html);
+      }
+    };
   }
 
   function escapeUnescapedHash(value) {

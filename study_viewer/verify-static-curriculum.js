@@ -68,6 +68,7 @@ function validateStaticFiles() {
   assertCheck(/fetch\(note\.path/.test(render), 'render.js fetches Markdown files');
   assertCheck(/notebookHtml/.test(render), 'render.js uses explicit notebookHtml manifest field');
  assertCheck(/protectHashInMathText/.test(render), 'render.js protects hash characters inside math text');
+assertCheck(/protectMarkdownMath/.test(render), 'render.js protects TeX spans before Markdown parsing');
  assertCheck(/sidebar-collapsed/.test(render), 'render.js toggles collapsed sidebar state');
   assertCheck(/<iframe/.test(render) && /sandbox=""/.test(render), 'render.js creates sandboxed notebook iframe with empty sandbox');
   assertCheck(!/allow-scripts/.test(render), 'render.js does not allow notebook iframe scripts');
