@@ -23,12 +23,55 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Static preflight
+        run: |
+          set -euo pipefail
+          for f in study_viewer/*.js; do node --check "$f"; done
+          python3 -m py_compile scripts/*.py
+          node study_viewer/verify-static-curriculum.js
+
+      - name: HTTP preflight
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --directory study_viewer > /tmp/aisp-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid' EXIT
+          sleep 1
+          curl -fsSI http://127.0.0.1:4173/ >/tmp/aisp-root.headers
+          curl -fsS http://127.0.0.1:4173/notes-manifest.js >/tmp/aisp-manifest.js
+          curl -fsS http://127.0.0.1:4173/study_notes/on_device_ai/practice/01_pruning_cnn_practice_guide.md >/tmp/aisp-guide.md
+          curl -fsS http://127.0.0.1:4173/notebooks/on_device_ai/01_pruning_cnn.html >/tmp/aisp-notebook.html
+          curl -fsS http://127.0.0.1:4173/image.png >/tmp/aisp-image.png
+          test -s /tmp/aisp-manifest.js
+          test -s /tmp/aisp-guide.md
+          test -s /tmp/aisp-notebook.html
+          test -s /tmp/aisp-image.png
+
+      - name: Browser split-view preflight
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 --directory study_viewer > /tmp/aisp-browser-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid' EXIT
+          sleep 1
+          node scripts/browser_smoke_study_viewer.cjs
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
+
       - name: Upload study viewer
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: study_viewer
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

@@ -110,10 +110,11 @@ function validateNoDeniedPublicFiles(notes) {
     assertCheck(!fs.existsSync(path.join(ROOT, denied)), `denied public file absent: ${denied}`);
     assertCheck(!notes.some((note) => note.path === denied.replace(/^study_viewer\//, '')), `denied manifest path absent: ${denied}`);
   }
-  const allPublicFiles = walk(path.join(APP_DIR, 'study_notes'));
+  const allPublicFiles = walk(APP_DIR);
   for (const file of allPublicFiles) {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/');
-    assertCheck(!/study_viewer\/study_notes\/on_device_ai\/(ch01_|01_cnn_pruning_deep_review)/.test(rel), `no legacy On-Device draft file in public artifact: ${rel}`);
+    assertCheck(!/study_viewer\/.*\/on_device_ai\/(ch01_|01_cnn_pruning_deep_review)/.test(rel), `no legacy On-Device draft file anywhere in public artifact: ${rel}`);
+    assertCheck(!/study_viewer\/.*(answer|colab).*\.ipynb$/i.test(rel), `no answer/colab notebook variant anywhere in public artifact: ${rel}`);
   }
 }
 
