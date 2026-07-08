@@ -7,6 +7,7 @@
   const rawLink = document.querySelector('#raw-link');
   const search = document.querySelector('#note-search');
   const sideNote = document.querySelector('.side-note p');
+  const sidebarToggle = document.querySelector('#sidebar-toggle');
   const validIds = new Set(notes.map((note) => note.id));
 
   if (window.mermaid) {
@@ -14,7 +15,8 @@
       startOnLoad: false,
       theme: 'dark',
       securityLevel: 'strict',
-      flowchart: { htmlLabels: false, curve: 'basis' },
+      flowchart: { htmlLabels: false, curve: 'basis', useMaxWidth: false },
+      sequence: { useMaxWidth: false },
       themeVariables: {
         background: '#101820',
         primaryColor: '#172331',
@@ -22,7 +24,8 @@
         primaryBorderColor: '#74b8ff',
         lineColor: '#98a9b3',
         secondaryColor: '#1d2c3a',
-        tertiaryColor: '#0f171f'
+        tertiaryColor: '#0f171f',
+        fontSize: '18px'
       }
     });
   }
@@ -117,6 +120,84 @@
     return window.DOMPurify ? window.DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] }) : raw;
   }
 
+  function escapeUnescapedHash(value) {
+    let output = '';
+    for (let index = 0; index < value.length; index += 1) {
+      const char = value[index];
+      if (char !== '#') {
+        output += char;
+        continue;
+      }
+      let slashCount = 0;
+      for (let back = index - 1; back >= 0 && value[back] === '\\'; back -= 1) slashCount += 1;
+      output += slashCount % 2 === 0 ? '\\#' : '#';
+    }
+    return output;
+  }
+
+  function findClosingMath(text, start, delimiter) {
+    for (let index = start; index < text.length; index += 1) {
+      if (!text.startsWith(delimiter, index)) continue;
+      let slashCount = 0;
+      for (let back = index - 1; back >= 0 && text[back] === '\\'; back -= 1) slashCount += 1;
+      if (slashCount % 2 === 0) return index;
+    }
+    return -1;
+  }
+
+  function protectHashInMathText(text) {
+    let output = '';
+    let index = 0;
+    while (index < text.length) {
+      let open = '';
+      let close = '';
+      if (text.startsWith('$$', index)) {
+        open = '$$';
+        close = '$$';
+      } else if (text.startsWith('\\(', index)) {
+        open = '\\(';
+        close = '\\)';
+      } else if (text.startsWith('\\[', index)) {
+        open = '\\[';
+        close = '\\]';
+      } else if (text[index] === '$' && text[index + 1] !== '$') {
+        open = '$';
+        close = '$';
+      }
+      if (!open) {
+        output += text[index];
+        index += 1;
+        continue;
+      }
+      const contentStart = index + open.length;
+      const contentEnd = findClosingMath(text, contentStart, close);
+      if (contentEnd < 0) {
+        output += text.slice(index);
+        break;
+      }
+      output += open + escapeUnescapedHash(text.slice(contentStart, contentEnd)) + close;
+      index = contentEnd + close.length;
+    }
+    return output;
+  }
+
+  function protectMathTextNodes(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent || parent.closest('pre, code, .mermaid, mjx-container')) return NodeFilter.FILTER_REJECT;
+        return /#/.test(node.nodeValue) && /(\$|\\\(|\\\[)/.test(node.nodeValue)
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_SKIP;
+      }
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      node.nodeValue = protectHashInMathText(node.nodeValue);
+    });
+  }
+
   function enhanceRenderedContent(root, note) {
     root.querySelectorAll('a[href]').forEach((link) => {
       const href = link.getAttribute('href');
@@ -136,6 +217,7 @@
       img.loading = 'lazy';
       img.decoding = 'async';
     });
+    protectMathTextNodes(root);
     if (window.mermaid) {
       window.mermaid.run({ nodes: root.querySelectorAll('.mermaid') }).catch((error) => console.warn('Mermaid render failed', error));
     }
@@ -210,6 +292,19 @@
     renderNote(link.dataset.noteId);
   });
   search.addEventListener('input', () => renderNav(normalizeHash()));
+  if (sidebarToggle) {
+    const setSidebarCollapsed = (collapsed) => {
+      document.body.classList.toggle('sidebar-collapsed', collapsed);
+      sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+      sidebarToggle.textContent = collapsed ? '목차 열기' : '목차 접기';
+    };
+    setSidebarCollapsed(window.localStorage.getItem('aiStudySidebarCollapsed') === '1');
+    sidebarToggle.addEventListener('click', () => {
+      const collapsed = !document.body.classList.contains('sidebar-collapsed');
+      window.localStorage.setItem('aiStudySidebarCollapsed', collapsed ? '1' : '0');
+      setSidebarCollapsed(collapsed);
+    });
+  }
   window.addEventListener('hashchange', () => renderNote(normalizeHash()));
   renderNav(normalizeHash());
   renderNote(normalizeHash());

@@ -63,13 +63,18 @@ function validateStaticFiles() {
   assertCheck(/mathjax@/.test(html), 'index.html loads MathJax');
   assertCheck(/notes-manifest\.js/.test(html), 'index.html loads notes manifest');
   assertCheck(/render\.js/.test(html), 'index.html loads render.js');
+ assertCheck(/sidebar-toggle/.test(html), 'index.html includes sidebar toggle');
   assertCheck(/AI_STUDY_NOTES/.test(render), 'render.js consumes AI_STUDY_NOTES');
   assertCheck(/fetch\(note\.path/.test(render), 'render.js fetches Markdown files');
   assertCheck(/notebookHtml/.test(render), 'render.js uses explicit notebookHtml manifest field');
+ assertCheck(/protectHashInMathText/.test(render), 'render.js protects hash characters inside math text');
+ assertCheck(/sidebar-collapsed/.test(render), 'render.js toggles collapsed sidebar state');
   assertCheck(/<iframe/.test(render) && /sandbox=""/.test(render), 'render.js creates sandboxed notebook iframe with empty sandbox');
   assertCheck(!/allow-scripts/.test(render), 'render.js does not allow notebook iframe scripts');
   assertCheck(!/allow-same-origin/.test(render), 'render.js does not allow notebook iframe same-origin access');
   assertCheck(/notebook-layout/.test(styles) && /grid-template-columns/.test(styles), 'styles define notebook split-view grid');
+ assertCheck(/sidebar-collapsed/.test(styles), 'styles define collapsed sidebar layout');
+ assertCheck(/\.mermaid svg/.test(styles) && /max-width:\s*none/.test(styles), 'styles keep wide Mermaid diagrams readable');
   assertCheck(/@media \(max-width/.test(styles), 'styles define responsive fallback');
   assertCheck(/font-size:\s*18\.5px/.test(styles), 'styles increase study body font size');
   assertCheck(/Pretendard|Noto Sans KR/.test(styles), 'styles include requested Korean font stack');

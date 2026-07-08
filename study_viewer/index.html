@@ -20,7 +20,7 @@
   </script>
 </head>
 <body>
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="brand-mark">AI</div>
       <div>
@@ -28,6 +28,10 @@
         <p>Markdown lecture viewer</p>
       </div>
     </div>
+
+    <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-expanded="true" aria-controls="sidebar">
+      목차 접기
+    </button>
 
     <label class="search-box" for="note-search">
       <span>노트 검색</span>
