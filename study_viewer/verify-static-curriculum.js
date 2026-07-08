@@ -159,6 +159,15 @@ function validateNotebookEntry(note, label) {
   assertCheck(note.kind === 'notebook', `${label} has kind notebook`);
   assertCheck(typeof note.notebookHtml === 'string' && note.notebookHtml.startsWith('notebooks/'), `${label} notebookHtml stays under notebooks/`);
   assertCheck(typeof note.sourceIpynb === 'string' && note.sourceIpynb.endsWith('.ipynb'), `${label} sourceIpynb records original notebook`);
+  const sourceGuidePath = path.join(ROOT, note.path);
+  const publicGuidePath = path.join(APP_DIR, note.path);
+  assertCheck(fs.existsSync(sourceGuidePath), `${label} source guide exists`);
+  if (fs.existsSync(sourceGuidePath) && fs.existsSync(publicGuidePath)) {
+    assertCheck(
+      fs.readFileSync(sourceGuidePath, 'utf8') === fs.readFileSync(publicGuidePath, 'utf8'),
+      `${label} public guide mirror matches source guide`
+    );
+  }
   const htmlPath = path.join(APP_DIR, note.notebookHtml);
   assertCheck(fs.existsSync(htmlPath), `${label} notebook HTML exists`);
   if (!fs.existsSync(htmlPath)) return;

@@ -353,5 +353,10 @@ def write_guide(config: dict):
     (OUT_DIR / config['out']).write_text('\n'.join(out), encoding='utf-8')
     print(config['out'], len(cells), 'cells ->', len(out), 'lines')
 
-for cfg in PRACTICES:
-    write_guide(cfg)
+def main() -> None:
+    for cfg in PRACTICES:
+        write_guide(cfg)
+
+
+if __name__ == '__main__':
+    main()
