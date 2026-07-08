@@ -170,6 +170,8 @@ function validateNotebookEntry(note, label) {
   assertCheck(!/javascript\s*:/i.test(htmlText), `${label} notebook HTML has no javascript URLs`);
   assertCheck(/nb-cell/.test(htmlText), `${label} notebook HTML contains notebook cells`);
   assertCheck(/nb-code/.test(htmlText), `${label} notebook HTML contains code cells`);
+        assertCheck(/language-python/.test(htmlText), `${label} notebook HTML marks Python code language`);
+        assertCheck(/tok-k/.test(htmlText) && /tok-s/.test(htmlText), `${label} notebook HTML includes static syntax highlight spans`);
   assertCheck(/nb-markdown/.test(htmlText), `${label} notebook HTML contains markdown cells`);
 }
 

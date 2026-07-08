@@ -8,9 +8,12 @@ javascript/data HTML links outside image data URLs.
 from __future__ import annotations
 
 import html
+import io
 import json
+import keyword
 import re
 import sys
+import tokenize
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse
@@ -252,6 +255,60 @@ def render_markdown(src: str) -> str:
     return "\n".join(out)
 
 
+PYTHON_BUILTINS = {
+    "abs", "all", "any", "bool", "bytes", "callable", "dict", "dir", "enumerate",
+    "float", "getattr", "hasattr", "int", "isinstance", "len", "list", "map", "max",
+    "min", "next", "open", "print", "range", "repr", "reversed", "round", "set",
+    "sorted", "str", "sum", "super", "tuple", "type", "zip",
+}
+TOKEN_CLASS = {
+    tokenize.COMMENT: "c",
+    tokenize.STRING: "s",
+    tokenize.NUMBER: "m",
+    tokenize.OP: "o",
+}
+
+
+def span(class_name: str, value: str) -> str:
+    return f'<span class="tok-{class_name}">{html.escape(value)}</span>'
+
+
+def highlight_python(source: str) -> str:
+    """Return scriptless GitHub-dark-ish highlighted Python HTML."""
+    output: list[str] = []
+    cursor_line = 1
+    cursor_col = 0
+    try:
+        tokens = tokenize.generate_tokens(io.StringIO(source).readline)
+        for token in tokens:
+            token_type = token.type
+            token_text = token.string
+            if token_type in {tokenize.ENCODING, tokenize.ENDMARKER}:
+                continue
+            start_line, start_col = token.start
+            end_line, end_col = token.end
+            if start_line > cursor_line:
+                output.append("\n" * (start_line - cursor_line))
+                cursor_col = 0
+            if start_col > cursor_col:
+                output.append(" " * (start_col - cursor_col))
+            if token_type == tokenize.NAME:
+                if keyword.iskeyword(token_text):
+                    output.append(span("k", token_text))
+                elif token_text in PYTHON_BUILTINS:
+                    output.append(span("b", token_text))
+                else:
+                    output.append(html.escape(token_text))
+            elif token_type in TOKEN_CLASS:
+                output.append(span(TOKEN_CLASS[token_type], token_text))
+            else:
+                output.append(html.escape(token_text))
+            cursor_line, cursor_col = end_line, end_col
+        return "".join(output)
+    except tokenize.TokenError:
+        return html.escape(source)
+
+
 def render_output(output) -> str:
     otype = output.get("output_type", "")
     if otype == "stream":
@@ -290,7 +347,7 @@ def convert(ipynb: Path, out: Path, title: str | None = None):
             exec_count = cell.get("execution_count")
             prompt = f"In [{exec_count if exec_count is not None else ' '}]:"
             outputs = "".join(render_output(o) for o in cell.get("outputs", []))
-            body = f'<div class="nb-code-head">{html.escape(prompt)}</div><pre class="nb-code"><code>{html.escape(src)}</code></pre>{outputs}'
+            body = f'<div class="nb-code-head">{html.escape(prompt)}</div><pre class="nb-code"><code class="language-python">{highlight_python(src)}</code></pre>{outputs}'
         else:
             body = f"<pre>{html.escape(src)}</pre>"
         cells.append(f'<section class="nb-cell nb-{html.escape(str(ctype))}" data-cell="{idx}">{body}</section>')
@@ -317,6 +374,7 @@ def convert(ipynb: Path, out: Path, title: str | None = None):
     .nb-code-head {{ color:var(--accent); font-weight:800; margin-bottom:8px; font-size:13px; }}
     .nb-code {{ background:var(--code); color:var(--code-ink); border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.58; }}
     code {{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace; }}
+ .tok-k {{ color:#ff7b72; font-weight:650; }} .tok-b {{ color:#d2a8ff; }} .tok-s {{ color:#a5d6ff; }} .tok-m {{ color:#79c0ff; }} .tok-c {{ color:#8b949e; font-style:italic; }} .tok-o {{ color:#ff7b72; }}
     .nb-output {{ margin-top:12px; border-left:4px solid #93c5fd; background:#f1f7ff; border-radius:10px; padding:10px 12px; }}
     .nb-error {{ border-left-color:#ef4444; background:#fff1f2; }}
     .nb-image img, .nb-markdown img, .nb-html img {{ max-width:100%; height:auto; display:block; }}
@@ -332,6 +390,7 @@ def convert(ipynb: Path, out: Path, title: str | None = None):
 </body>
 </html>
 """
+    document = "\n".join(line.rstrip() for line in document.splitlines()) + "\n"
     if re.search(r"<\s*(script|iframe|object|embed|form)\b", document, re.I):
         raise RuntimeError(f"unsafe active markup remained in {out}")
     if re.search(r"\son[a-zA-Z]+\s*=", document, re.I) or re.search(r"javascript\s*:", document, re.I):
