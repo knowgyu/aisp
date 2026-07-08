@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+import sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 NB_DIR = ROOT / 'On-Device AI 강의자료' / '실습'
@@ -354,6 +355,14 @@ def write_guide(config: dict):
     print(config['out'], len(cells), 'cells ->', len(out), 'lines')
 
 def main() -> None:
+    if '--force-generated' not in sys.argv:
+        print(
+            'Refusing to overwrite curated ODAI practice guides. '
+            'These files are now manually maintained for study quality. '
+            'Pass --force-generated only if you intentionally want to regenerate heuristic drafts.',
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
     for cfg in PRACTICES:
         write_guide(cfg)
 
