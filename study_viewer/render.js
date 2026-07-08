@@ -348,7 +348,7 @@
     rawLink.textContent = note.kind === 'notebook' ? 'Guide MD' : 'Raw MD';
     if (sideNote) {
       sideNote.textContent = note.kind === 'notebook'
-        ? '실습 페이지는 왼쪽 설명과 오른쪽 원본 노트북 HTML을 동시에 보여줍니다. 노트북은 sandboxed iframe으로 격리됩니다.'
+        ? '실습 페이지는 왼쪽 설명과 오른쪽 원본 노트북 HTML을 동시에 보여줍니다. 노트북은 sandboxed iframe으로 격리하되, 수식 렌더링용 스크립트만 허용합니다.'
         : '왼쪽에서 노트를 고르면 오른쪽에 Markdown 원문이 문서형으로 렌더링됩니다. 수식, Mermaid, 이미지를 함께 확인합니다.';
     }
   }
@@ -371,7 +371,7 @@
                 <strong>Original Notebook HTML</strong>
                 <a href="${escapeHtml(note.notebookHtml)}" target="_blank" rel="noreferrer">새 탭</a>
               </div>
-              <iframe class="notebook-iframe" title="${escapeHtml(note.title)} 원본 노트북 HTML" src="${escapeHtml(note.notebookHtml)}" sandbox="" loading="lazy"></iframe>
+              <iframe class="notebook-iframe" title="${escapeHtml(note.title)} 원본 노트북 HTML" src="${escapeHtml(note.notebookHtml)}" sandbox="allow-scripts" loading="lazy"></iframe>
             </aside>
           </div>
         `;

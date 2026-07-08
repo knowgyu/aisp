@@ -3,7 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Assignment 3. Knowledge Distillation</title>
+  <title>Practice 03. Knowledge Distillation</title>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], processEscapes: true },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <style>
     :root { color-scheme: light; --bg:#f8fafc; --paper:#ffffff; --ink:#17202a; --muted:#5c6b7a; --line:#d9e2ec; --code:#0f172a; --code-ink:#d9f3ff; --accent:#2563eb; }
     * { box-sizing:border-box; }
@@ -29,7 +36,7 @@
 </head>
 <body>
   <main class="nb-wrap">
-    <h1 class="nb-title">Assignment 3. Knowledge Distillation</h1>
+    <h1 class="nb-title">Practice 03. Knowledge Distillation</h1>
     <p class="nb-source">Source notebook: On-Device AI 강의자료/실습/3. Knowledge Distillation.ipynb</p>
     <section class="nb-cell nb-markdown" data-cell="1"><h1>Assignment 3. Knowledge Distillation</h1></section><section class="nb-cell nb-markdown" data-cell="2"><h2>Goals</h2>
 <p>이 실습의 목적은 <strong>Knowledge Distillation</strong>을 활용하여, 작은 모델(Student)이 큰 모델(Teacher)의 지식을 효과적으로 학습하는 방법을 이해하고 실험을 통해 비교하는 것입니다.</p>

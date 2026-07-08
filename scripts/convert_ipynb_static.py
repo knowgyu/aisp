@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert Jupyter notebooks to scriptless static HTML using only stdlib.
+"""Convert Jupyter notebooks to static study HTML using only stdlib.
 
 The output is for static study reading. It preserves markdown/code/outputs where
 safe, but never emits scripts, inline event handlers, active embedded content, or
@@ -19,6 +19,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 SCRIPT_RE = re.compile(r"<\s*script\b[^>]*>.*?<\s*/\s*script\s*>", re.I | re.S)
+ALLOWED_MATHJAX_CONFIG_RE = re.compile(r"<script>\s*window\.MathJax = \{.*?\};\s*</script>", re.S)
+ALLOWED_MATHJAX_SRC_RE = re.compile(r'<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg\.js"></script>')
 EVENT_ATTR_RE = re.compile(r"\s+on[a-zA-Z]+\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+)", re.I)
 
 SAFE_HTML_TAGS = {
@@ -109,6 +111,11 @@ class SafeHTMLParser(HTMLParser):
     def handle_charref(self, name):
         if not self.drop_depth:
             self.out.append(f"&#{name};")
+
+
+def strip_allowed_mathjax_scripts(value: str) -> str:
+    value = ALLOWED_MATHJAX_CONFIG_RE.sub("", value)
+    return ALLOWED_MATHJAX_SRC_RE.sub("", value)
 
 
 def sanitize_html_fragment(value: str) -> str:
@@ -368,6 +375,13 @@ def convert(ipynb: Path, out: Path, title: str | None = None):
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
+  <script>
+    window.MathJax = {{
+      tex: {{ inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], processEscapes: true }},
+      svg: {{ fontCache: 'global' }}
+    }};
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <style>
     :root {{ color-scheme: light; --bg:#f8fafc; --paper:#ffffff; --ink:#17202a; --muted:#5c6b7a; --line:#d9e2ec; --code:#0f172a; --code-ink:#d9f3ff; --accent:#2563eb; }}
     * {{ box-sizing:border-box; }}
@@ -401,9 +415,10 @@ def convert(ipynb: Path, out: Path, title: str | None = None):
 </html>
 """
     document = "\n".join(line.rstrip() for line in document.splitlines()) + "\n"
-    if re.search(r"<\s*(script|iframe|object|embed|form)\b", document, re.I):
+    safety_document = strip_allowed_mathjax_scripts(document)
+    if re.search(r"<\s*(script|iframe|object|embed|form)\b", safety_document, re.I):
         raise RuntimeError(f"unsafe active markup remained in {out}")
-    if re.search(r"\son[a-zA-Z]+\s*=", document, re.I) or re.search(r"javascript\s*:", document, re.I):
+    if re.search(r"\son[a-zA-Z]+\s*=", safety_document, re.I) or re.search(r"javascript\s*:", safety_document, re.I):
         raise RuntimeError(f"unsafe script/event/protocol markup remained in {out}")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(document, encoding="utf-8")

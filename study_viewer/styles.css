@@ -24,7 +24,7 @@ body {
   margin: 0;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   background:
     radial-gradient(circle at 20% 0%, rgba(63, 128, 201, 0.20), transparent 34rem),
     linear-gradient(135deg, #0b1017 0%, #0f1720 52%, #121b24 100%);
@@ -124,8 +124,8 @@ body.sidebar-collapsed .sidebar-toggle {
 .side-note { margin-top: auto; padding: 14px; border: 1px solid var(--line-soft); border-radius: 16px; background: rgba(255, 255, 255, 0.035); }
 .side-note h2 { margin-bottom: 8px; font-size: 15px; }
 
-.doc-shell { width: min(1440px, 100%); margin: 0 auto; padding: 30px 32px 96px; }
-body.sidebar-collapsed .doc-shell { width: min(1760px, 100%); }
+.doc-shell { width: min(1680px, 100%); margin: 0 auto; padding: 30px 24px 96px; }
+body.sidebar-collapsed .doc-shell { width: min(1840px, 100%); }
 .topbar {
   position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between;
   gap: 24px; align-items: center; margin-bottom: 22px; padding: 17px 21px;
@@ -209,7 +209,7 @@ body.sidebar-collapsed .doc-shell { width: min(1760px, 100%); }
 .notebook-content { background: transparent; border: 0; box-shadow: none; padding: 0; }
 .notebook-layout {
   display: grid;
-  grid-template-columns: minmax(0, 0.98fr) minmax(420px, 1.02fr);
+  grid-template-columns: minmax(555px, 1.15fr) minmax(515px, 1fr);
   gap: 22px;
   align-items: start;
 }

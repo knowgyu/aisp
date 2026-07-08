@@ -70,8 +70,8 @@ function validateStaticFiles() {
  assertCheck(/protectHashInMathText/.test(render), 'render.js protects hash characters inside math text');
 assertCheck(/protectMarkdownMath/.test(render), 'render.js protects TeX spans before Markdown parsing');
  assertCheck(/sidebar-collapsed/.test(render), 'render.js toggles collapsed sidebar state');
-  assertCheck(/<iframe/.test(render) && /sandbox=""/.test(render), 'render.js creates sandboxed notebook iframe with empty sandbox');
-  assertCheck(!/allow-scripts/.test(render), 'render.js does not allow notebook iframe scripts');
+ assertCheck(/<iframe/.test(render) && /sandbox="allow-scripts"/.test(render), 'render.js creates sandboxed notebook iframe with script-only sandbox');
+ assertCheck(/allow-scripts/.test(render), 'render.js allows notebook MathJax scripts');
   assertCheck(!/allow-same-origin/.test(render), 'render.js does not allow notebook iframe same-origin access');
   assertCheck(/notebook-layout/.test(styles) && /grid-template-columns/.test(styles), 'styles define notebook split-view grid');
  assertCheck(/sidebar-collapsed/.test(styles), 'styles define collapsed sidebar layout');
@@ -174,10 +174,14 @@ function validateNotebookEntry(note, label) {
   if (!fs.existsSync(htmlPath)) return;
   const htmlText = fs.readFileSync(htmlPath, 'utf8');
   assertCheck(htmlText.trim().length > 0, `${label} notebook HTML non-empty`);
-  assertCheck(!/<\s*script\b/i.test(htmlText), `${label} notebook HTML has no script tags`);
-  assertCheck(!/<\s*(iframe|object|embed|form)\b/i.test(htmlText), `${label} notebook HTML has no active embedded tags`);
-  assertCheck(!/\son[a-zA-Z]+\s*=/i.test(htmlText), `${label} notebook HTML has no inline event handlers`);
-  assertCheck(!/javascript\s*:/i.test(htmlText), `${label} notebook HTML has no javascript URLs`);
+  const htmlWithoutAllowedMathJax = htmlText
+    .replace(/<script>\s*window\.MathJax = \{[\s\S]*?\};\s*<\/script>/g, '')
+    .replace(/<script defer src="https:\/\/cdn\.jsdelivr\.net\/npm\/mathjax@3\/es5\/tex-svg\.js"><\/script>/g, '');
+  assertCheck(/window\.MathJax/.test(htmlText), `${label} notebook HTML loads MathJax for Markdown math`);
+  assertCheck(!/<\s*script\b/i.test(htmlWithoutAllowedMathJax), `${label} notebook HTML has no non-MathJax script tags`);
+  assertCheck(!/<\s*(iframe|object|embed|form)\b/i.test(htmlWithoutAllowedMathJax), `${label} notebook HTML has no active embedded tags`);
+  assertCheck(!/\son[a-zA-Z]+\s*=/i.test(htmlWithoutAllowedMathJax), `${label} notebook HTML has no inline event handlers`);
+  assertCheck(!/javascript\s*:/i.test(htmlWithoutAllowedMathJax), `${label} notebook HTML has no javascript URLs`);
   assertCheck(/nb-cell/.test(htmlText), `${label} notebook HTML contains notebook cells`);
   assertCheck(/nb-code/.test(htmlText), `${label} notebook HTML contains code cells`);
         assertCheck(/language-python/.test(htmlText), `${label} notebook HTML marks Python code language`);
@@ -210,10 +214,14 @@ function validateConverterFixture() {
   assertCheck(/data:image\/png;base64/.test(text), 'fixture preserves image output');
   assertCheck(/<img src="data:image\/png;base64/.test(text), 'fixture preserves markdown and raw image tags safely');
   assertCheck(/<table>/.test(text) && /<td>ok<\/td>/.test(text), 'fixture preserves safe HTML table output');
-  assertCheck(!/<\s*script\b/i.test(text), 'fixture strips script tags');
-  assertCheck(!/<\s*(iframe|object|embed|form)\b/i.test(text), 'fixture strips active embedded tags');
-  assertCheck(!/\son[a-zA-Z]+\s*=/i.test(text), 'fixture strips inline event handlers');
-  assertCheck(!/javascript\s*:/i.test(text), 'fixture strips javascript URLs');
+ const fixtureWithoutAllowedMathJax = text
+   .replace(/<script>\s*window\.MathJax = \{[\s\S]*?\};\s*<\/script>/g, '')
+   .replace(/<script defer src="https:\/\/cdn\.jsdelivr\.net\/npm\/mathjax@3\/es5\/tex-svg\.js"><\/script>/g, '');
+ assertCheck(/window\.MathJax/.test(text), 'fixture includes allowed MathJax scripts');
+ assertCheck(!/<\s*script\b/i.test(fixtureWithoutAllowedMathJax), 'fixture strips non-MathJax script tags');
+ assertCheck(!/<\s*(iframe|object|embed|form)\b/i.test(fixtureWithoutAllowedMathJax), 'fixture strips active embedded tags');
+ assertCheck(!/\son[a-zA-Z]+\s*=/i.test(fixtureWithoutAllowedMathJax), 'fixture strips inline event handlers');
+ assertCheck(!/javascript\s*:/i.test(fixtureWithoutAllowedMathJax), 'fixture strips javascript URLs');
 }
 
 validateStaticFiles();

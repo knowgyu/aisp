@@ -3,7 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Assignment 4. Pruning LLM</title>
+  <title>Practice 04. Pruning for LLM</title>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], processEscapes: true },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <style>
     :root { color-scheme: light; --bg:#f8fafc; --paper:#ffffff; --ink:#17202a; --muted:#5c6b7a; --line:#d9e2ec; --code:#0f172a; --code-ink:#d9f3ff; --accent:#2563eb; }
     * { box-sizing:border-box; }
@@ -29,7 +36,7 @@
 </head>
 <body>
   <main class="nb-wrap">
-    <h1 class="nb-title">Assignment 4. Pruning LLM</h1>
+    <h1 class="nb-title">Practice 04. Pruning for LLM</h1>
     <p class="nb-source">Source notebook: On-Device AI 강의자료/실습/4. Pruning for LLM.ipynb</p>
     <section class="nb-cell nb-markdown" data-cell="1"><h1>Assignment 4. Pruning for LLM</h1></section><section class="nb-cell nb-markdown" data-cell="2"><h2>Goals</h2>
 <p>본 실습에서는 대규모 언어 모델(Large Language Model, LLM)의 크기를 효과적으로 줄이는 Pruning 기법을 학습합니다. 특히 Magnitude-based pruning과 최근 주목받는 Wanda 기법을 활용하여, 파라미터의 수를 효율적으로 감소시키면서 모델의 성능을 유지하는 방법을 실습합니다.</p>
