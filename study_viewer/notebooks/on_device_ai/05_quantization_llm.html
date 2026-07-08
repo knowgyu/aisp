@@ -36,425 +36,218 @@
 <p>LLM은 파라미터의 개수가 매우 많기 때문에 일반적으로 FP16으로 관리합니다. 그럼에도 파라미터의 크기가 많이 크며, LLaMA-2 7B와 같이 작은 모델에 대해서도 모바일 환경에서 수행하고자 하는 경우 FP16에서도 최소 14GB 이상의 메모리를 요구하며 이는 실제로 돌리기에 무리가 있습니다. 따라서, 양자화를 통해 모델의 weight를 더 낮은 precision으로 압축하는 것이 가능합니다.</p></section><section class="nb-cell nb-markdown" data-cell="3"><h2>Contents</h2>
 <ul><li>Weight-only Quantization</li><li>Weight만 quantization을 적용합니다.</li><li>장점: 매우 낮은 bit-width로 weight를 양자화할 수 있으며, 단일 배치 추론 환경에서 유리합니다.</li><li>단점: Dequantization 후 FP16 연산을 수행해야 합니다.</li><li>예시: AWQ (W3A16, W4A16)</li><li>Weight and Activation Quantization</li><li>Weight와 activation 모두 quantization을 적용합니다.</li><li>장점: 낮은 precision의 연산을 통해 가속 가능하며, 대규모 배치 추론 환경에서 유리합니다.</li><li>단점: weight의 bit-width를 낮추기에 한계가 존재합니다.</li><li>예시: SmoothQuant (W8A8)</li></ul></section><section class="nb-cell nb-markdown" data-cell="4"><h2>Setup</h2></section><section class="nb-cell nb-markdown" data-cell="5"><p>실습에 필요한 패키지를 설치합니다.</p></section><section class="nb-cell nb-code" data-cell="6"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># print(&quot;Setting up environment...&quot;)</span>
 
-
-
 <span class="tok-c"># # 패키지 설치</span>
-
 <span class="tok-c"># # !pip install -q torch transformers==4.31.0 accelerate==0.21.0 sentencepiece==0.1.99 tokenizers==0.13.3 datasets==2.15.0 tqdm zstandard huggingface-hub==0.27.0</span>
 
-
-
 <span class="tok-c"># # 데이터 다운로드</span>
-
 <span class="tok-c"># !mkdir -p \content\data</span>
-
 <span class="tok-c"># !curl -sL https://huggingface.co/datasets/mit-han-lab/pile-val-backup/resolve/main/val.jsonl.zst -o /content/data/val.jsonl.zst</span>
 
-
-
 <span class="tok-c"># # 환경 변수 설정</span>
-
 <span class="tok-c"># import os</span>
-
 <span class="tok-c"># os.environ[&quot;CUDA_VISIBLE_DEVICES&quot;] = &quot;0&quot;</span>
-
 <span class="tok-c"># os.environ[&quot;HF_HOME&quot;] = &quot;/content/hf_cache&quot;</span>
-
 <span class="tok-c"># datapath = &quot;/content/data/val.jsonl.zst&quot;</span>
 
-
-
 <span class="tok-c"># weights_path = &quot;opt_125m_weights.pth&quot;</span>
-
 <span class="tok-c"># weights_url = &quot;https://www.dropbox.com/scl/fi/mumd3abnbhyz03v0bopn8/opt_125m_weights.pth?rlkey=lo8gaw3axn8o9i8sw0kivxfwx&amp;st=onxynbq2&amp;dl=1&quot;</span>
 
-
-
 <span class="tok-c"># if not os.path.exists(weights_path):</span>
-
 <span class="tok-c">#     print(f&quot;Downloading weights from {weights_url}...&quot;)</span>
-
 <span class="tok-c">#     # curl -L -o [저장파일명] [URL] (&#x27;dl=1&#x27;로 변경하여 직접 다운로드)</span>
-
 <span class="tok-c">#     os.system(f&quot;curl -L -o {weights_path} &#x27;{weights_url}&#x27;&quot;)</span>
-
 <span class="tok-c">#     print(&quot;Download complete.&quot;)</span>
-
 <span class="tok-c"># else:</span>
-
 <span class="tok-c">#     print(&quot;Weights file already exists.&quot;)</span>
-
-
 
 <span class="tok-c"># print(&quot;Environment ready.&quot;)</span>
 
-
-
 <span class="tok-k">import</span> os
-
 <span class="tok-k">import</span> urllib<span class="tok-o">.</span>request
-
-
 
 <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Setting up environment...&quot;</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 패키지 설치</span>
-
 <span class="tok-o">!</span>pip install <span class="tok-o">-</span>q torch transformers<span class="tok-o">==</span><span class="tok-m">4.31</span><span class="tok-m">.0</span> accelerate<span class="tok-o">==</span><span class="tok-m">0.21</span><span class="tok-m">.0</span> sentencepiece<span class="tok-o">==</span><span class="tok-m">0.1</span><span class="tok-m">.99</span> tokenizers<span class="tok-o">==</span><span class="tok-m">0.13</span><span class="tok-m">.3</span> datasets<span class="tok-o">==</span><span class="tok-m">2.15</span><span class="tok-m">.0</span> tqdm zstandard huggingface<span class="tok-o">-</span>hub<span class="tok-o">==</span><span class="tok-m">0.27</span><span class="tok-m">.0</span>
 
-
-
 <span class="tok-c"># 1. 경로 설정</span>
-
 BASE_DIR <span class="tok-o">=</span> os<span class="tok-o">.</span>getcwd<span class="tok-o">(</span><span class="tok-o">)</span>
-
 DATA_DIR <span class="tok-o">=</span> os<span class="tok-o">.</span>path<span class="tok-o">.</span>join<span class="tok-o">(</span>BASE_DIR<span class="tok-o">,</span> <span class="tok-s">&quot;data&quot;</span><span class="tok-o">)</span>
-
 HF_CACHE_DIR <span class="tok-o">=</span> os<span class="tok-o">.</span>path<span class="tok-o">.</span>join<span class="tok-o">(</span>BASE_DIR<span class="tok-o">,</span> <span class="tok-s">&quot;hf_cache&quot;</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 환경 변수 설정</span>
-
 os<span class="tok-o">.</span>environ<span class="tok-o">[</span><span class="tok-s">&quot;CUDA_VISIBLE_DEVICES&quot;</span><span class="tok-o">]</span> <span class="tok-o">=</span> <span class="tok-s">&quot;0&quot;</span>
-
 os<span class="tok-o">.</span>environ<span class="tok-o">[</span><span class="tok-s">&quot;HF_HOME&quot;</span><span class="tok-o">]</span> <span class="tok-o">=</span> HF_CACHE_DIR
 
-
-
 <span class="tok-c"># 2. 데이터 폴더 생성</span>
-
 os<span class="tok-o">.</span>makedirs<span class="tok-o">(</span>DATA_DIR<span class="tok-o">,</span> exist_ok<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 데이터 다운로드</span>
-
 datapath <span class="tok-o">=</span> os<span class="tok-o">.</span>path<span class="tok-o">.</span>join<span class="tok-o">(</span>DATA_DIR<span class="tok-o">,</span> <span class="tok-s">&quot;val.jsonl.zst&quot;</span><span class="tok-o">)</span>
-
 data_url <span class="tok-o">=</span> <span class="tok-s">&quot;https://huggingface.co/datasets/mit-han-lab/pile-val-backup/resolve/main/val.jsonl.zst&quot;</span>
 
-
-
 <span class="tok-k">if</span> <span class="tok-k">not</span> os<span class="tok-o">.</span>path<span class="tok-o">.</span>exists<span class="tok-o">(</span>datapath<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Downloading data from <span class="tok-o">{</span>data_url<span class="tok-o">}</span>...&quot;<span class="tok-o">)</span>
-
     <span class="tok-c"># 파이썬 내장 모듈을 사용해 OS 상관없이 다운로드 처리</span>
-
     urllib<span class="tok-o">.</span>request<span class="tok-o">.</span>urlretrieve<span class="tok-o">(</span>data_url<span class="tok-o">,</span> datapath<span class="tok-o">)</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Data download complete.&quot;</span><span class="tok-o">)</span>
-
 <span class="tok-k">else</span><span class="tok-o">:</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Data file already exists.&quot;</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 3. 모델 가중치 다운로드</span>
-
 weights_path <span class="tok-o">=</span> os<span class="tok-o">.</span>path<span class="tok-o">.</span>join<span class="tok-o">(</span>BASE_DIR<span class="tok-o">,</span> <span class="tok-s">&quot;opt_125m_weights.pth&quot;</span><span class="tok-o">)</span>
-
 weights_url <span class="tok-o">=</span> <span class="tok-s">&quot;https://www.dropbox.com/scl/fi/mumd3abnbhyz03v0bopn8/opt_125m_weights.pth?rlkey=lo8gaw3axn8o9i8sw0kivxfwx&amp;st=onxynbq2&amp;dl=1&quot;</span>
 
-
-
 <span class="tok-k">if</span> <span class="tok-k">not</span> os<span class="tok-o">.</span>path<span class="tok-o">.</span>exists<span class="tok-o">(</span>weights_path<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Downloading weights from <span class="tok-o">{</span>weights_url<span class="tok-o">}</span>...&quot;<span class="tok-o">)</span>
-
     urllib<span class="tok-o">.</span>request<span class="tok-o">.</span>urlretrieve<span class="tok-o">(</span>weights_url<span class="tok-o">,</span> weights_path<span class="tok-o">)</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Weights download complete.&quot;</span><span class="tok-o">)</span>
-
 <span class="tok-k">else</span><span class="tok-o">:</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Weights file already exists.&quot;</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Environment ready.&quot;</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="7"><p>실습에 필요한 모듈을 로드합니다.</p></section><section class="nb-cell nb-code" data-cell="8"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">import</span> torch
-
 <span class="tok-k">import</span> gc
-
 <span class="tok-k">import</span> numpy <span class="tok-k">as</span> np
-
 <span class="tok-k">import</span> matplotlib<span class="tok-o">.</span>pyplot <span class="tok-k">as</span> plt
 
-
-
 <span class="tok-k">from</span> tqdm <span class="tok-k">import</span> tqdm
-
 <span class="tok-k">from</span> torch <span class="tok-k">import</span> nn
-
 <span class="tok-k">from</span> transformers <span class="tok-k">import</span> AutoModelForCausalLM<span class="tok-o">,</span> AutoTokenizer<span class="tok-o">,</span> AutoConfig
-
 <span class="tok-k">from</span> datasets <span class="tok-k">import</span> load_dataset
-
 <span class="tok-k">from</span> functools <span class="tok-k">import</span> partial
-
 <span class="tok-k">from</span> matplotlib<span class="tok-o">.</span>colors <span class="tok-k">import</span> Normalize
-
 <span class="tok-k">from</span> transformers<span class="tok-o">.</span>models<span class="tok-o">.</span>opt<span class="tok-o">.</span>modeling_opt <span class="tok-k">import</span> OPTDecoderLayer
-
 <span class="tok-k">from</span> transformers<span class="tok-o">.</span>models<span class="tok-o">.</span>bloom<span class="tok-o">.</span>modeling_bloom <span class="tok-k">import</span> BloomBlock
-
 <span class="tok-k">from</span> transformers<span class="tok-o">.</span>models<span class="tok-o">.</span>llama<span class="tok-o">.</span>modeling_llama <span class="tok-k">import</span> LlamaDecoderLayer<span class="tok-o">,</span> LlamaRMSNorm</code></pre></section><section class="nb-cell nb-markdown" data-cell="9"><p>다음 코드는 모델 크기를 계산하는 데 사용됩니다.</p></section><section class="nb-cell nb-code" data-cell="10"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">class</span> LLMModel<span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     대형언어모델(LLM)의 평가 및 관리 클래스.
     &quot;&quot;&quot;</span>
 
-
-
     <span class="tok-k">def</span> __init__<span class="tok-o">(</span>self<span class="tok-o">,</span> model_name<span class="tok-o">,</span> weights_path<span class="tok-o">=</span><span class="tok-k">None</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         self<span class="tok-o">.</span>model_name <span class="tok-o">=</span> model_name
-
         self<span class="tok-o">.</span>weights_path <span class="tok-o">=</span> weights_path
 
-
-
         <span class="tok-k">if</span> <span class="tok-o">(</span>self<span class="tok-o">.</span>weights_path <span class="tok-o">!=</span> <span class="tok-k">None</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>_load_model_from_weights<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             <span class="tok-c"># 사전학습된 언어모델 로드</span>
-
             self<span class="tok-o">.</span>model <span class="tok-o">=</span> AutoModelForCausalLM<span class="tok-o">.</span>from_pretrained<span class="tok-o">(</span>
-
                 model_name<span class="tok-o">,</span>
-
                 device_map<span class="tok-o">=</span><span class="tok-s">&quot;auto&quot;</span><span class="tok-o">,</span>
-
                 torch_dtype<span class="tok-o">=</span>torch<span class="tok-o">.</span>float16<span class="tok-o">,</span>
-
                 use_safetensors<span class="tok-o">=</span><span class="tok-k">True</span>
-
             <span class="tok-o">)</span>
-
             self<span class="tok-o">.</span>model<span class="tok-o">.</span>eval<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># 평가 모드 설정 (dropout 비활성화)</span>
 
-
-
         <span class="tok-c"># 토크나이저 로드 (토크나이저는 아키텍처와 세트이므로 from_pretrained 유지)</span>
-
         self<span class="tok-o">.</span>tokenizer <span class="tok-o">=</span> AutoTokenizer<span class="tok-o">.</span>from_pretrained<span class="tok-o">(</span>model_name<span class="tok-o">,</span> use_fast<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># 평가용 데이터셋 로드 (WikiText-2)</span>
-
         testenc <span class="tok-o">=</span> load_dataset<span class="tok-o">(</span><span class="tok-s">&#x27;wikitext&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;wikitext-2-raw-v1&#x27;</span><span class="tok-o">,</span> split<span class="tok-o">=</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">)</span>
-
         testenc <span class="tok-o">=</span> self<span class="tok-o">.</span>tokenizer<span class="tok-o">(</span><span class="tok-s">&quot;\n\n&quot;</span><span class="tok-o">.</span>join<span class="tok-o">(</span>testenc<span class="tok-o">[</span><span class="tok-s">&#x27;text&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">,</span> return_tensors<span class="tok-o">=</span><span class="tok-s">&#x27;pt&#x27;</span><span class="tok-o">)</span>
-
         self<span class="tok-o">.</span>testenc <span class="tok-o">=</span> testenc<span class="tok-o">.</span>input_ids<span class="tok-o">.</span>to<span class="tok-o">(</span>self<span class="tok-o">.</span>model<span class="tok-o">.</span>device<span class="tok-o">)</span>
-
-
 
         self<span class="tok-o">.</span>model_changed <span class="tok-o">=</span> <span class="tok-k">False</span>
 
-
-
     <span class="tok-k">def</span> _load_model_from_weights<span class="tok-o">(</span>self<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Loading model architecture: <span class="tok-o">{</span>self<span class="tok-o">.</span>model_name<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
-
         config <span class="tok-o">=</span> AutoConfig<span class="tok-o">.</span>from_pretrained<span class="tok-o">(</span>self<span class="tok-o">.</span>model_name<span class="tok-o">)</span>
-
         self<span class="tok-o">.</span>model <span class="tok-o">=</span> AutoModelForCausalLM<span class="tok-o">.</span>from_config<span class="tok-o">(</span>config<span class="tok-o">)</span>
 
-
-
         <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Loading weights from: <span class="tok-o">{</span>self<span class="tok-o">.</span>weights_path<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
-
         checkpoint <span class="tok-o">=</span> torch<span class="tok-o">.</span>load<span class="tok-o">(</span>self<span class="tok-o">.</span>weights_path<span class="tok-o">,</span> map_location<span class="tok-o">=</span><span class="tok-s">&quot;cpu&quot;</span><span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># --- [수정] state_dict 키 확인 및 추출 로직 추가 ---</span>
-
         <span class="tok-k">if</span> <span class="tok-s">&quot;state_dict&quot;</span> <span class="tok-k">in</span> checkpoint<span class="tok-o">:</span>
-
             state_dict <span class="tok-o">=</span> checkpoint<span class="tok-o">[</span><span class="tok-s">&quot;state_dict&quot;</span><span class="tok-o">]</span>
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             state_dict <span class="tok-o">=</span> checkpoint
 
-
-
         <span class="tok-k">try</span><span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>model<span class="tok-o">.</span>load_state_dict<span class="tok-o">(</span>state_dict<span class="tok-o">)</span>
-
         <span class="tok-k">except</span> RuntimeError <span class="tok-k">as</span> e<span class="tok-o">:</span>
-
             <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Error loading state_dict directly. Attempting strict=False...&quot;</span><span class="tok-o">)</span>
-
             <span class="tok-b">print</span><span class="tok-o">(</span>e<span class="tok-o">)</span>
-
             self<span class="tok-o">.</span>model<span class="tok-o">.</span>load_state_dict<span class="tok-o">(</span>state_dict<span class="tok-o">,</span> strict<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span>
 
-
-
         self<span class="tok-o">.</span>model<span class="tok-o">.</span>to<span class="tok-o">(</span>dtype<span class="tok-o">=</span>torch<span class="tok-o">.</span>float16<span class="tok-o">)</span>
-
         self<span class="tok-o">.</span>model<span class="tok-o">.</span>cuda<span class="tok-o">(</span><span class="tok-o">)</span>
-
         self<span class="tok-o">.</span>model<span class="tok-o">.</span>eval<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-k">def</span> _evaluate<span class="tok-o">(</span>self<span class="tok-o">)</span><span class="tok-o">:</span>
-
         nsamples <span class="tok-o">=</span> <span class="tok-m">100</span>
-
         nlls <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
 
-
-
         <span class="tok-k">for</span> i <span class="tok-k">in</span> tqdm<span class="tok-o">(</span><span class="tok-b">range</span><span class="tok-o">(</span>nsamples<span class="tok-o">)</span><span class="tok-o">,</span> desc<span class="tok-o">=</span><span class="tok-s">&quot;evaluating...&quot;</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             batch <span class="tok-o">=</span> self<span class="tok-o">.</span>testenc<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span> <span class="tok-o">(</span>i <span class="tok-o">*</span> <span class="tok-m">2048</span><span class="tok-o">)</span><span class="tok-o">:</span><span class="tok-o">(</span><span class="tok-o">(</span>i <span class="tok-o">+</span> <span class="tok-m">1</span><span class="tok-o">)</span> <span class="tok-o">*</span> <span class="tok-m">2048</span><span class="tok-o">)</span><span class="tok-o">]</span><span class="tok-o">.</span>to<span class="tok-o">(</span>self<span class="tok-o">.</span>model<span class="tok-o">.</span>device<span class="tok-o">)</span>
-
             <span class="tok-k">with</span> torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
                 lm_logits <span class="tok-o">=</span> self<span class="tok-o">.</span>model<span class="tok-o">(</span>batch<span class="tok-o">)</span><span class="tok-o">.</span>logits
 
-
-
             shift_logits <span class="tok-o">=</span> lm_logits<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span> <span class="tok-o">:</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-o">:</span><span class="tok-o">]</span><span class="tok-o">.</span>contiguous<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">float</span><span class="tok-o">(</span><span class="tok-o">)</span>
-
             shift_labels <span class="tok-o">=</span> self<span class="tok-o">.</span>testenc<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span> <span class="tok-o">(</span>i <span class="tok-o">*</span> <span class="tok-m">2048</span><span class="tok-o">)</span><span class="tok-o">:</span><span class="tok-o">(</span><span class="tok-o">(</span>i <span class="tok-o">+</span> <span class="tok-m">1</span><span class="tok-o">)</span> <span class="tok-o">*</span> <span class="tok-m">2048</span><span class="tok-o">)</span><span class="tok-o">]</span><span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span> <span class="tok-m">1</span><span class="tok-o">:</span><span class="tok-o">]</span>
 
-
-
             loss_fct <span class="tok-o">=</span> nn<span class="tok-o">.</span>CrossEntropyLoss<span class="tok-o">(</span><span class="tok-o">)</span>
-
             loss <span class="tok-o">=</span> loss_fct<span class="tok-o">(</span>
-
                 shift_logits<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> shift_logits<span class="tok-o">.</span>size<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
                 shift_labels<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span>
-
             <span class="tok-o">)</span>
-
             neg_log_likelihood <span class="tok-o">=</span> loss<span class="tok-o">.</span><span class="tok-b">float</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">*</span> <span class="tok-m">2048</span>
-
             nlls<span class="tok-o">.</span>append<span class="tok-o">(</span>neg_log_likelihood<span class="tok-o">)</span>
-
-
 
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>exp<span class="tok-o">(</span>torch<span class="tok-o">.</span>stack<span class="tok-o">(</span>nlls<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">/</span> <span class="tok-o">(</span>nsamples <span class="tok-o">*</span> <span class="tok-m">2048</span><span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-k">def</span> get_model_size<span class="tok-o">(</span>self<span class="tok-o">,</span> data_width<span class="tok-o">=</span><span class="tok-m">16</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> group_size <span class="tok-o">!=</span> <span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">:</span>
-
             data_width <span class="tok-o">+=</span> <span class="tok-o">(</span><span class="tok-m">16</span> <span class="tok-o">+</span> <span class="tok-m">4</span><span class="tok-o">)</span> <span class="tok-o">/</span> group_size
-
         num_elements <span class="tok-o">=</span> <span class="tok-b">sum</span><span class="tok-o">(</span>param<span class="tok-o">.</span>numel<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-k">for</span> param <span class="tok-k">in</span> self<span class="tok-o">.</span>model<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
         <span class="tok-k">return</span> num_elements <span class="tok-o">*</span> data_width
 
-
-
     <span class="tok-k">def</span> model_delete<span class="tok-o">(</span>self<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">del</span> self<span class="tok-o">.</span>model
-
         gc<span class="tok-o">.</span>collect<span class="tok-o">(</span><span class="tok-o">)</span>
-
         torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>empty_cache<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-k">def</span> model_evaluate<span class="tok-o">(</span>self<span class="tok-o">,</span> data_width<span class="tok-o">,</span> group_size<span class="tok-o">)</span><span class="tok-o">:</span>
-
         model_perplexity <span class="tok-o">=</span> self<span class="tok-o">.</span>_evaluate<span class="tok-o">(</span><span class="tok-o">)</span>
-
         model_size <span class="tok-o">=</span> self<span class="tok-o">.</span>get_model_size<span class="tok-o">(</span>data_width<span class="tok-o">=</span>data_width<span class="tok-o">,</span> group_size<span class="tok-o">=</span>group_size<span class="tok-o">)</span>
 
-
-
         <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;\nmodel perplexity: <span class="tok-o">{</span>model_perplexity<span class="tok-o">:</span>.2f<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
-
         <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;model size: <span class="tok-o">{</span>model_size <span class="tok-o">/</span> <span class="tok-m">1024</span> <span class="tok-o">/</span> <span class="tok-m">1024</span> <span class="tok-o">/</span> <span class="tok-m">8</span><span class="tok-o">:</span>.2f<span class="tok-o">}</span> MiB&quot;<span class="tok-o">)</span>
-
         <span class="tok-k">return</span> model_perplexity
 
-
-
     <span class="tok-k">def</span> model_reset<span class="tok-o">(</span>self<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;
         모델이 변경된 경우 초기 가중치 파일로 재설정
         &quot;&quot;&quot;</span>
-
         <span class="tok-k">if</span> self<span class="tok-o">.</span>model_changed<span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>model_delete<span class="tok-o">(</span><span class="tok-o">)</span>
-
             <span class="tok-c"># 초기 로드 로직 재사용</span>
-
             <span class="tok-k">if</span> <span class="tok-o">(</span>self<span class="tok-o">.</span>weights_path <span class="tok-o">!=</span> <span class="tok-k">None</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
                 self<span class="tok-o">.</span>_load_model_from_weights<span class="tok-o">(</span><span class="tok-o">)</span>
-
             <span class="tok-k">else</span><span class="tok-o">:</span>
-
                 <span class="tok-c"># 사전학습된 언어모델 로드</span>
-
                 self<span class="tok-o">.</span>model <span class="tok-o">=</span> AutoModelForCausalLM<span class="tok-o">.</span>from_pretrained<span class="tok-o">(</span>
-
                     self<span class="tok-o">.</span>model_name<span class="tok-o">,</span>
-
                     device_map<span class="tok-o">=</span><span class="tok-s">&quot;auto&quot;</span><span class="tok-o">,</span>
-
                     torch_dtype<span class="tok-o">=</span>torch<span class="tok-o">.</span>float16<span class="tok-o">,</span>
-
                     use_safetensors<span class="tok-o">=</span><span class="tok-k">True</span>
-
                 <span class="tok-o">)</span>
-
                 self<span class="tok-o">.</span>model<span class="tok-o">.</span>eval<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># 평가 모드 설정 (dropout 비활성화)</span>
-
             self<span class="tok-o">.</span>model_changed <span class="tok-o">=</span> <span class="tok-k">False</span>
 
-
-
     <span class="tok-k">def</span> model_change<span class="tok-o">(</span>self<span class="tok-o">,</span> model<span class="tok-o">:</span> nn<span class="tok-o">.</span>Module<span class="tok-o">)</span><span class="tok-o">:</span>
-
         self<span class="tok-o">.</span>model_delete<span class="tok-o">(</span><span class="tok-o">)</span>
-
         self<span class="tok-o">.</span>model <span class="tok-o">=</span> model
-
         self<span class="tok-o">.</span>model<span class="tok-o">.</span>eval<span class="tok-o">(</span><span class="tok-o">)</span>
-
-        self<span class="tok-o">.</span>model_changed <span class="tok-o">=</span> <span class="tok-k">True</span>
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="11"><p>먼저 FP32 모델의 혼란도(perflexity)와 모델 크기를 평가해봅시다.</p>
+        self<span class="tok-o">.</span>model_changed <span class="tok-o">=</span> <span class="tok-k">True</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="11"><p>먼저 FP32 모델의 혼란도(perflexity)와 모델 크기를 평가해봅시다.</p>
 <p>LLaMA-65B 모델의 디코딩 단계에서 단일 배치 추론을 수행할 때, 우리는 $[1, 8192] \times [8192, 8192]$ 형태의 GEMV(General Matrix-Vector Multiplication)연산을 수행해야 합니다.</p>
 <p>NVIDIA A100 80G의 경우, <strong>half-precision(FP16)</strong> 에서의 성능은 312TFLOPS이며, memory bandwidth는 약 2000GB/s 입니다. 이를 바탕으로, <strong>계산 집약도(computation intensity)</strong> 를 계산할 수 있습니다:</p>
 <p>$$ \frac{\text{FLOP}}{\text{Byte}} = \frac{2\times 8192^2}{(8192+8192^2)×\text{DataByte}} &lt;&lt; \frac{3.12\times 10^{14}}{2\times 10^{12}} $$</p>
 <p>이는 매우 메모리 제약적(Memory-bounded)(~$10^2$ gap)으로, 저비트 가중치 양자화가 필요한 이유입니다.</p></section><section class="nb-cell nb-code" data-cell="12"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">model_path <span class="tok-o">=</span> <span class="tok-s">&quot;facebook/opt-125m&quot;</span>
-
 <span class="tok-c"># LLMModel 인스턴스 생성 시 가중치 파일 경로도 함께 전달 (위에서 정의한 weights_path)</span>
-
 llm_model <span class="tok-o">=</span> LLMModel<span class="tok-o">(</span>model_path<span class="tok-o">,</span> weights_path<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Evaluate the model</span>
-
 llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">32</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="13"><h1>4.1. Weight-only Quantization (AWQ)</h1>
 <p>AWQ (activation aware weight only quantization)</p></section><section class="nb-cell nb-markdown" data-cell="14"><p>대형 언어 모델(LLM)은 다양한 작업에서 뛰어난 성능을 보여주고 있지만, 엄청난 모델 크기로 인해 하드웨어적 장벽(메모리 크기)이 높아지고, 토큰 생성 속도가 느려집니다(메모리 대역폭). LLM의 크기와 계산량은 기하급수적으로 증가하고 있는 반면, 메모리 대역폭은 느리게 증가하고 있습니다. 이 격차는 LLM 성능에서 중요한 병목 현상입니다. 이번 실습에서는 <strong>새로운 양자화 알고리즘(AWQ)</strong>을 사용하여 LLM의 메모리 사용량을 줄이고 추론 속도를 가속화하는 방법을 탐구할 것입니다.</p></section><section class="nb-cell nb-markdown" data-cell="15"><h2>AWQ</h2></section><section class="nb-cell nb-markdown" data-cell="16"><p>Uniform quantization 은 실수 값을 range $[\beta, \alpha]$에서 $[0, 2^{b} - 1]$로 매핑하는 것입니다.</p>
 <p>Notation:</p>
@@ -466,296 +259,151 @@ llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>d
 <p>\begin{equation} w_q = \text{Clamp}(\text{Round}(\frac{w}{s_q}) + z) \tag{3}, \end{equation}</p></section><section class="nb-cell nb-markdown" data-cell="17"><h2>Pseudo Quantization</h2>
 <p>아래 코드는 의사 양자화(pseudo quantization)을 위한 것입니다.</p>
 <p>Pseudo Quantization는 모델의 가중치를 실제로 양자화하지 않고, 양자화의 영향을 시뮬레이션하기 위해 사용됩니다. (즉, 가장 가까운 양자화된 값으로 반올림한 다음, <strong>다시 부동 소수점으로 복원(dequantizing)하는</strong> 것입니다.)</p></section><section class="nb-cell nb-code" data-cell="18"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># 핵심 양자화 함수 (simulated quantization, 즉 실제 비트 축소 없이 효과만 모사)</span>
-
 <span class="tok-k">def</span> pseudo_quantize_tensor<span class="tok-o">(</span>w<span class="tok-o">,</span> n_bit<span class="tok-o">=</span><span class="tok-m">4</span><span class="tok-o">,</span> q_group_size<span class="tok-o">=</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     org_w_shape <span class="tok-o">=</span> w<span class="tok-o">.</span>shape
-
     <span class="tok-c"># 그룹 단위 양자화 적용 시 weight 행렬을 그룹 크기로 재구성</span>
-
     <span class="tok-k">if</span> q_group_size <span class="tok-o">&gt;</span> <span class="tok-m">0</span><span class="tok-o">:</span>
-
         <span class="tok-k">assert</span> org_w_shape<span class="tok-o">[</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">]</span> <span class="tok-o">%</span> q_group_size <span class="tok-o">==</span> <span class="tok-m">0</span>
-
         w <span class="tok-o">=</span> w<span class="tok-o">.</span>reshape<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> q_group_size<span class="tok-o">)</span>
-
-
 
     <span class="tok-k">assert</span> w<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">2</span>
 
-
-
     <span class="tok-c"># 각 행(또는 그룹)별 최대값(α)과 최소값(β) 계산</span>
-
     max_val <span class="tok-o">=</span> w<span class="tok-o">.</span>amax<span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
     min_val <span class="tok-o">=</span> w<span class="tok-o">.</span>amin<span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 스케일(scale)과 제로포인트(zero point) 계산</span>
-
     <span class="tok-c"># scale = (α - β) / (2^n_bit - 1)</span>
-
     <span class="tok-c"># zero = round(-β / scale)</span>
-
     max_int <span class="tok-o">=</span> <span class="tok-m">2</span> <span class="tok-o">**</span> n_bit <span class="tok-o">-</span> <span class="tok-m">1</span>
-
     scales <span class="tok-o">=</span> <span class="tok-o">(</span>max_val <span class="tok-o">-</span> min_val<span class="tok-o">)</span><span class="tok-o">.</span>clamp<span class="tok-o">(</span><span class="tok-b">min</span><span class="tok-o">=</span><span class="tok-m">1e-5</span><span class="tok-o">)</span> <span class="tok-o">/</span> max_int
-
     zeros <span class="tok-o">=</span> <span class="tok-o">(</span><span class="tok-o">-</span>torch<span class="tok-o">.</span><span class="tok-b">round</span><span class="tok-o">(</span>min_val <span class="tok-o">/</span> scales<span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">.</span>clamp_<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">,</span> max_int<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># NaN 검증</span>
-
     <span class="tok-k">assert</span> torch<span class="tok-o">.</span>isnan<span class="tok-o">(</span>scales<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span>
-
     <span class="tok-k">assert</span> torch<span class="tok-o">.</span>isnan<span class="tok-o">(</span>w<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span>
-
-
 
     <span class="tok-c"># 양자화(Quantization) 단계: 실수값을 정수 범위 [0, 2^n_bit - 1]로 매핑</span>
-
     w <span class="tok-o">=</span> torch<span class="tok-o">.</span>clamp<span class="tok-o">(</span>torch<span class="tok-o">.</span><span class="tok-b">round</span><span class="tok-o">(</span>w <span class="tok-o">/</span> scales<span class="tok-o">)</span> <span class="tok-o">+</span> zeros<span class="tok-o">,</span> <span class="tok-m">0</span><span class="tok-o">,</span> max_int<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 복원 단계(Dequantization): 정수값을 다시 실수 범위로 변환 (pseudo quantization)</span>
-
     w <span class="tok-o">=</span> <span class="tok-o">(</span>w <span class="tok-o">-</span> zeros<span class="tok-o">)</span> <span class="tok-o">*</span> scales
 
-
-
     <span class="tok-c"># NaN 검증</span>
-
     <span class="tok-k">assert</span> torch<span class="tok-o">.</span>isnan<span class="tok-o">(</span>w<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span>
 
-
-
     <span class="tok-c"># 원래 텐서 형태로 복원</span>
-
     w <span class="tok-o">=</span> w<span class="tok-o">.</span>reshape<span class="tok-o">(</span>org_w_shape<span class="tok-o">)</span>
-
     <span class="tok-k">return</span> w
 
 
-
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> pseudo_quantize_model_weight<span class="tok-o">(</span>model<span class="tok-o">,</span> w_bit<span class="tok-o">,</span> q_group_size<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-c"># 모델 내 Linear 계층의 weight만 선택적으로 pseudo quantization 적용</span>
-
     <span class="tok-k">for</span> n<span class="tok-o">,</span> m <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span><span class="tok-o">:</span>
-
             m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> pseudo_quantize_tensor<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">,</span> n_bit<span class="tok-o">=</span>w_bit<span class="tok-o">,</span> q_group_size<span class="tok-o">=</span>q_group_size
-
-            <span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="19"><p>이제 quantized 3-bit 모델의 혼란도(perplexity)와 크기를 평가해 봅시다.</p></section><section class="nb-cell nb-code" data-cell="20"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
+            <span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="19"><p>이제 quantized 3-bit 모델의 혼란도(perplexity)와 크기를 평가해 봅시다.</p></section><section class="nb-cell nb-code" data-cell="20"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
 pseudo_quantize_model_weight<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> w_bit<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> q_group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span>
-
 llm_model<span class="tok-o">.</span>model_changed <span class="tok-o">=</span> <span class="tok-k">True</span>
 
-
-
 <span class="tok-c"># Evaluate the model</span>
-
 llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="21"><p>모델 크기가 줄어든 것은 확인할 수 있지만, 혼란도(perplexity)는 상당히 증가했습니다.</p></section><section class="nb-cell nb-markdown" data-cell="22"><p>논문에서의 관찰에 따르면 LLM의 활성화(activations)에서 일부 채널에 <strong>아웃라이어(outliers)</strong>가 소량 발생하고 있습니다. 특정 채널에 아웃라이어가 있는 경우, 이는 <strong>모든 토큰에서 지속적으로 나타납니다.</strong></p>
 <p>주어진 토큰에 대한 채널 간의 분산(variance)은 크지만(일부 채널의 활성화는 매우 크고, 대부분은 작습니다), 특정 채널의 크기(magnitude)가 토큰 간에 가지는 분산은 작습니다(아웃라이어 채널은 지속적으로 큽니다).</p>
 <p>AWQ(Activation Aware Weight Quantization)의 기법에 따르면, 활성화(activation) 아웃라이어에 해당하는 가중치 채널은 더 두드러지며, 이러한 두드러진 가중치를 보존하는 것이 성능 향상으로 이어질 수 있습니다. 다음으로, 두드러진 가중치를 찾고 원래 값으로 유지하여 혼란도(perplexity)의 변화를 관찰해 보겠습니다.</p>
 <p>아래 코드는 calibration 데이터셋을 로드하여 활성화 아웃라이어를 얻고 두드러진 가중치를 식별하는 데 사용됩니다.</p></section><section class="nb-cell nb-code" data-cell="23"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> get_calib_dataset<span class="tok-o">(</span>tokenizer<span class="tok-o">=</span><span class="tok-k">None</span><span class="tok-o">,</span> n_samples<span class="tok-o">=</span><span class="tok-m">256</span><span class="tok-o">,</span> block_size<span class="tok-o">=</span><span class="tok-m">512</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     dataset <span class="tok-o">=</span> load_dataset<span class="tok-o">(</span><span class="tok-s">&quot;mit-han-lab/pile-val-backup&quot;</span><span class="tok-o">,</span> split<span class="tok-o">=</span><span class="tok-s">&quot;validation&quot;</span><span class="tok-o">)</span>
-
     dataset <span class="tok-o">=</span> dataset<span class="tok-o">.</span>shuffle<span class="tok-o">(</span>seed<span class="tok-o">=</span><span class="tok-m">42</span><span class="tok-o">)</span>
 
-
-
     samples <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
-
     n_run <span class="tok-o">=</span> <span class="tok-m">0</span>
 
-
-
     <span class="tok-c"># n_samples 만큼 문장을 토크나이즈하여 샘플 생성</span>
-
     <span class="tok-k">for</span> data <span class="tok-k">in</span> dataset<span class="tok-o">:</span>
-
         line <span class="tok-o">=</span> data<span class="tok-o">[</span><span class="tok-s">&quot;text&quot;</span><span class="tok-o">]</span><span class="tok-o">.</span>strip<span class="tok-o">(</span><span class="tok-o">)</span>
-
         line_encoded <span class="tok-o">=</span> tokenizer<span class="tok-o">.</span>encode<span class="tok-o">(</span>line<span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># 너무 긴 문장은 제외</span>
-
         <span class="tok-k">if</span> <span class="tok-b">len</span><span class="tok-o">(</span>line_encoded<span class="tok-o">)</span> <span class="tok-o">&gt;</span> block_size<span class="tok-o">:</span>
-
             <span class="tok-k">continue</span>
-
-
 
         sample <span class="tok-o">=</span> torch<span class="tok-o">.</span>tensor<span class="tok-o">(</span><span class="tok-o">[</span>line_encoded<span class="tok-o">]</span><span class="tok-o">)</span>
-
         <span class="tok-k">if</span> sample<span class="tok-o">.</span>numel<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span><span class="tok-o">:</span>
-
             <span class="tok-k">continue</span>
 
-
-
         samples<span class="tok-o">.</span>append<span class="tok-o">(</span>sample<span class="tok-o">)</span>
-
         n_run <span class="tok-o">+=</span> <span class="tok-m">1</span>
 
-
-
         <span class="tok-c"># 설정된 개수만큼 샘플 수집 완료 시 종료</span>
-
         <span class="tok-k">if</span> n_run <span class="tok-o">==</span> n_samples<span class="tok-o">:</span>
-
             <span class="tok-k">break</span>
 
-
-
     <span class="tok-c"># 모든 샘플을 연결 후 block_size 단위로 나눔</span>
-
     cat_samples <span class="tok-o">=</span> torch<span class="tok-o">.</span>cat<span class="tok-o">(</span>samples<span class="tok-o">,</span> dim<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">)</span>
-
     n_split <span class="tok-o">=</span> cat_samples<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-m">1</span><span class="tok-o">]</span> <span class="tok-o">//</span> block_size
-
     <span class="tok-b">print</span><span class="tok-o">(</span>f&quot; * Split into <span class="tok-o">{</span>n_split<span class="tok-o">}</span> blocks&quot;<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># block_size 단위로 분할된 텐서 리스트 반환</span>
-
     <span class="tok-k">return</span> <span class="tok-o">[</span>cat_samples<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span> i <span class="tok-o">*</span> block_size<span class="tok-o">:</span><span class="tok-o">(</span>i <span class="tok-o">+</span> <span class="tok-m">1</span><span class="tok-o">)</span> <span class="tok-o">*</span> block_size<span class="tok-o">]</span> <span class="tok-k">for</span> i <span class="tok-k">in</span> <span class="tok-b">range</span><span class="tok-o">(</span>n_split<span class="tok-o">)</span><span class="tok-o">]</span>
 
 
-
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> get_calib_feat<span class="tok-o">(</span>model<span class="tok-o">,</span> tokenizer<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-c"># 각 Linear layer의 입력 활성값(activation) 통계를 수집하기 위한 훅 등록용 dict</span>
-
     input_dict <span class="tok-o">=</span> <span class="tok-b">dict</span><span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># forward hook 함수: layer 입력의 평균 절댓값(activation scale)을 계산</span>
-
     <span class="tok-k">def</span> stat_input_max_hook<span class="tok-o">(</span>m<span class="tok-o">,</span> x<span class="tok-o">,</span> y<span class="tok-o">,</span> name<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>x<span class="tok-o">,</span> <span class="tok-b">tuple</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             x <span class="tok-o">=</span> x<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
-
         <span class="tok-c"># 입력 텐서를 (batch*seq_len, hidden_dim) 형태로 reshape 한 뒤,</span>
-
         <span class="tok-c"># hidden_dim 방향으로 평균 절댓값 계산 → activation scale 추정</span>
-
         x_max <span class="tok-o">=</span> x<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> x<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>mean<span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span><span class="tok-o">.</span>cpu<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># 레이어별로 통계 누적</span>
-
         <span class="tok-k">if</span> name <span class="tok-k">not</span> <span class="tok-k">in</span> input_dict<span class="tok-o">:</span>
-
             input_dict<span class="tok-o">[</span>name<span class="tok-o">]</span> <span class="tok-o">=</span> <span class="tok-o">[</span>x_max<span class="tok-o">]</span>
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             input_dict<span class="tok-o">[</span>name<span class="tok-o">]</span> <span class="tok-o">+=</span> <span class="tok-o">[</span>x_max<span class="tok-o">]</span>
 
-
-
     hooks <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
-
     <span class="tok-c"># 모든 Linear layer에 대해 forward hook 등록</span>
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> m <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span><span class="tok-o">:</span>
-
             hooks<span class="tok-o">.</span>append<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>register_forward_hook<span class="tok-o">(</span>
-
                     partial<span class="tok-o">(</span>stat_input_max_hook<span class="tok-o">,</span> name<span class="tok-o">=</span>name<span class="tok-o">)</span>
-
                 <span class="tok-o">)</span>
-
             <span class="tok-o">)</span>
 
-
-
     <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Collecting activation scales...&quot;</span><span class="tok-o">)</span>
-
     device <span class="tok-o">=</span> torch<span class="tok-o">.</span>device<span class="tok-o">(</span><span class="tok-s">&quot;cuda&quot;</span> <span class="tok-k">if</span> torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>is_available<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-k">else</span> <span class="tok-s">&quot;cpu&quot;</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># calibration용 입력 데이터셋 생성</span>
-
     samples <span class="tok-o">=</span> get_calib_dataset<span class="tok-o">(</span>tokenizer<span class="tok-o">)</span>
-
     pbar <span class="tok-o">=</span> tqdm<span class="tok-o">(</span>samples<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 각 샘플을 모델에 통과시키며 hook으로 입력 통계 수집</span>
-
     <span class="tok-k">for</span> input_ids <span class="tok-k">in</span> pbar<span class="tok-o">:</span>
-
         input_ids <span class="tok-o">=</span> input_ids<span class="tok-o">.</span>to<span class="tok-o">(</span>device<span class="tok-o">)</span>
-
         model<span class="tok-o">(</span>input_ids<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># hook 해제</span>
-
     <span class="tok-k">for</span> hook <span class="tok-k">in</span> hooks<span class="tok-o">:</span>
-
         hook<span class="tok-o">.</span>remove<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 레이어별 입력 통계(activation scale) 반환</span>
-
-    <span class="tok-k">return</span> input_dict
-</code></pre></section><section class="nb-cell nb-code" data-cell="24"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
+    <span class="tok-k">return</span> input_dict</code></pre></section><section class="nb-cell nb-code" data-cell="24"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
 input_feat <span class="tok-o">=</span> get_calib_feat<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> llm_model<span class="tok-o">.</span>tokenizer<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="25"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>input_feat<span class="tok-o">[</span><span class="tok-s">&#x27;model.decoder.layers.0.self_attn.q_proj&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span>input_feat<span class="tok-o">[</span><span class="tok-s">&#x27;model.decoder.layers.0.self_attn.q_proj&#x27;</span><span class="tok-o">]</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span><span class="tok-o">.</span>shape<span class="tok-o">)</span>
-
-
 
 plt<span class="tok-o">.</span>figure<span class="tok-o">(</span>figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">20</span><span class="tok-o">,</span> <span class="tok-m">8</span><span class="tok-o">)</span><span class="tok-o">,</span> dpi<span class="tok-o">=</span><span class="tok-m">150</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-k">for</span> i<span class="tok-o">,</span> layer_idx <span class="tok-k">in</span> <span class="tok-b">enumerate</span><span class="tok-o">(</span><span class="tok-b">range</span><span class="tok-o">(</span><span class="tok-m">12</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
   plt<span class="tok-o">.</span>subplot<span class="tok-o">(</span><span class="tok-m">3</span><span class="tok-o">,</span> <span class="tok-m">4</span><span class="tok-o">,</span> i<span class="tok-o">+</span><span class="tok-m">1</span><span class="tok-o">)</span>
-
   plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>input_feat<span class="tok-o">[</span>f&#x27;model.decoder.layers.<span class="tok-o">{</span>layer_idx<span class="tok-o">}</span>.self_attn.q_proj&#x27;<span class="tok-o">]</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
   plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&quot;Activation&quot;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="26"><h1>[실습 1] Scale 1% salient channels</h1>
 <p>1%의 가중치를 FP16으로 유지하면 모델 크기(총 비트 수로 측정)를 크게 늘리지 않고도 양자화 성능을 향상시킬 수 있지만, 이러한 혼합 정밀도 데이터 유형은 시스템 구현을 어렵게 만듭니다.</p>
 <p>따라서 중요한 가중치를 실제로 FP16으로 유지하지 않고 중요한 가중치를 보호할 수 있는 방법을 찾아야 합니다.</p></section><section class="nb-cell nb-markdown" data-cell="27"><p>AWQ의 방법론에 따르면, 중요한 가중치 채널을 단순히 스케일링하여(특정한 값을 곱해 주어) 보호할 수 있습니다. 원리는 다음과 같습니다:</p>
@@ -763,82 +411,43 @@ plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-
 <ul><li>Quantization function $Q(\mathbf{w})$ = $Δ\cdot Round(\frac{\mathbf{w}}{Δ})$, $Δ = \frac{\max(|w|)}{2^{N - 1}}$.</li></ul>
 <ul><li>Quantization error $Err(Q(\mathbf{w}) x) = Δ\cdot RoundErr(\frac{\mathbf{w}}{Δ})\cdot x$</li><li>스케일링 된  Quantization error $Err(Q(\mathbf{w} \cdot s)(\frac{x}{s})) = Δ\cdot RoundErr(\frac{\mathbf{w}}{Δ})\cdot x\cdot \mathbf{\frac{1}{s}}$.</li><li>$RoundErr$ 는 언제나 ~0.25 입니다 (0-0.5 사이의 평균이므로).</li><li>그룹의 크기가 충분히 클 때(e.g., 128), 하나의 채널을 스케일링하는 것은 일반적으로 그룹 내 최대 값을 증가시키지 않습니다 (즉, $Δ$ 는 변하지 않습니다).</li><li>그러므로, $Err(Q(\mathbf{w} \cdot s)(\frac{x}{s})) = Δ\cdot RoundErr(\frac{\mathbf{w}}{Δ})\cdot x\cdot \mathbf{\frac{1}{s}}$ &lt; $Δ\cdot RoundErr(\frac{\mathbf{w}}{Δ})\cdot x = Err(Q(\mathbf{w}) x)$.</li></ul>
 <p>아래 코드를 완성하여 중요한 가중치 채널을 스케일링하고, 양자화 한 다음, 다시 스케일을 줄인 후 혼란도(perplexity)의 변화를 관찰해보세요.</p></section><section class="nb-cell nb-code" data-cell="28"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> pseudo_quantize_model_weight_scaleup<span class="tok-o">(</span>
-
     model<span class="tok-o">,</span> w_bit<span class="tok-o">,</span> q_group_size<span class="tok-o">,</span> input_feat<span class="tok-o">,</span> scale_factor
-
 <span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-k">for</span> n<span class="tok-o">,</span> m <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span><span class="tok-o">:</span>
-
             importance <span class="tok-o">=</span> <span class="tok-b">sum</span><span class="tok-o">(</span>input_feat<span class="tok-o">[</span>n<span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">float</span><span class="tok-o">(</span><span class="tok-o">)</span>
-
             <span class="tok-c"># 1퍼센트 채널의 개수</span>
-
             num_samples <span class="tok-o">=</span> <span class="tok-b">int</span><span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>importance<span class="tok-o">)</span> <span class="tok-o">*</span> <span class="tok-m">0.01</span><span class="tok-o">)</span>
 
-
-
             <span class="tok-c">############### YOUR CODE STARTS HERE ###############</span>
-
-
 
             <span class="tok-c"># Step 1: importance를 기준으로 1%의 중요한 채널을 찾으세요  (hint: use torch.topk())</span>
-
             <span class="tok-c"># hint : torch.topk() 함수를 사용하세요. torch.topk() 함수는 PyTorch에서 텐서의 값 중 상위 k개의 값과 그들의 인덱스를 반환하는 함수입니다. torch.topk()[0]는 값을, torch.topk()[1]은 인덱스를 반환합니다.</span>
-
             outlier_mask <span class="tok-o">=</span>
 
-
-
             <span class="tok-c">############### YOUR CODE ENDS HERE #################</span>
-
             <span class="tok-k">assert</span> outlier_mask<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">1</span>
-
-
 
             <span class="tok-c">############### YOUR CODE STARTS HERE ###############</span>
 
-
-
             <span class="tok-c"># 스케일 팩터를 적용하는 것을 시뮬레이션하기 위해, 양자화 전에 스케일 팩터를 곱하고, 양자화 후에 스케일 팩터로 나눕니다.</span>
-
             <span class="tok-c"># scale_factor를 이용해 중요한 가중치 채널의 값을 확대합니다.</span>
-
             m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span> outlier_mask<span class="tok-o">]</span>
-
-
 
             m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> pseudo_quantize_tensor<span class="tok-o">(</span>m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">,</span> n_bit<span class="tok-o">=</span>w_bit<span class="tok-o">,</span> q_group_size<span class="tok-o">=</span>q_group_size<span class="tok-o">)</span>
 
-
-
             <span class="tok-c"># Step 2: pseudo quantization이기 때문에 scale_factor를 이용해 중요한 가중치 채널의 값을 다시 축소하세요.</span>
-
             m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span> outlier_mask<span class="tok-o">]</span>
 
-
-
-            <span class="tok-c">############### YOUR CODE ENDS HERE #################</span>
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="29"><p>스케일링을 통해서 중요한 가중치를 보호함과 동시에, 모든 가중치를 3bit로 유지할 수 있었습니다.</p></section><section class="nb-cell nb-code" data-cell="30"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">for</span> scale_factor <span class="tok-k">in</span> <span class="tok-o">[</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-m">1.5</span><span class="tok-o">,</span> <span class="tok-m">2</span><span class="tok-o">,</span> <span class="tok-m">2.5</span><span class="tok-o">,</span> <span class="tok-m">3</span><span class="tok-o">]</span><span class="tok-o">:</span>
-
+            <span class="tok-c">############### YOUR CODE ENDS HERE #################</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="29"><p>스케일링을 통해서 중요한 가중치를 보호함과 동시에, 모든 가중치를 3bit로 유지할 수 있었습니다.</p></section><section class="nb-cell nb-code" data-cell="30"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">for</span> scale_factor <span class="tok-k">in</span> <span class="tok-o">[</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-m">1.5</span><span class="tok-o">,</span> <span class="tok-m">2</span><span class="tok-o">,</span> <span class="tok-m">2.5</span><span class="tok-o">,</span> <span class="tok-m">3</span><span class="tok-o">]</span><span class="tok-o">:</span>
     <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;=========== Scale_factor : <span class="tok-o">{</span>scale_factor<span class="tok-o">}</span> ===========&quot;<span class="tok-o">)</span>
-
     llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
     pseudo_quantize_model_weight_scaleup<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> w_bit<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> q_group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">,</span> input_feat<span class="tok-o">=</span>input_feat<span class="tok-o">,</span> scale_factor<span class="tok-o">=</span>scale_factor<span class="tok-o">)</span>
-
     llm_model<span class="tok-o">.</span>model_changed <span class="tok-o">=</span> <span class="tok-k">True</span>
 
-
-
     <span class="tok-c"># Evaluate the model</span>
-
-    llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="31"><p>코드에서 서로 다른 스케일링 팩터 $s$를 시도하고 혼란도(perplexity)의 변화를 관찰해보세요.</p>
+    llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="31"><p>코드에서 서로 다른 스케일링 팩터 $s$를 시도하고 혼란도(perplexity)의 변화를 관찰해보세요.</p>
 <p>혼란도(perplexity)가 먼저 감소하다가 다시 증가하는 것을 관찰했나요?</p>
 <p>너무 큰 팩터로 스케일링하면 그룹 내 최대 값이 증가할 수 있습니다(즉,$Δ$가 증가함).</p>
 <p>이는 다른 채널의 양자화에 영향을 미칠 수 있습니다.</p></section><section class="nb-cell nb-markdown" data-cell="32"><h1>[실습 2] Scale factor search</h1>
@@ -848,369 +457,190 @@ plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-
 <p>우리는 스케일링 팩터 $s$를 활성화의 L1-norm (즉, acviation matrix의 절댓값들의 평균)의 $\alpha$제곱으로 설정할 것입니다.</p>
 <p>$\alpha$의 값은 grid search를 통해 적절한 값으로 검색합니다.</p>
 <p>검색을 위한 코드를 추가하고 실행하여 혼란도(perplexity)를 관찰하세요.</p></section><section class="nb-cell nb-markdown" data-cell="33"><p>$$ 𝐋(\mathbf{s})=\lVert Q(\mathbf{W}\cdot \mathbf{s})  (\mathbf{s^{-1}} \cdot \mathbf{X}) - \mathbf{W}\mathbf{X}  \rVert,  \quad\mathbf{s}= \mathbf{s_X}^{\alpha},  \mathbf{s_X} = \|X\|_1 $$ $$ \mathbf{s}^<em> = \text{argmin}_{\mathbf{s}} 𝐋(\mathbf{s}),\quad \alpha^</em>=\text{argmin}_{\alpha} 𝐋(\mathbf{s_X}^{\alpha}) $$</p></section><section class="nb-cell nb-code" data-cell="34"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> scale_ln_fcs<span class="tok-o">(</span>ln<span class="tok-o">,</span> fcs<span class="tok-o">,</span> scales<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     LayerNorm(LN)과 그 다음에 연결된 Linear layer(fc)들의 파라미터 스케일을 조정
     &quot;&quot;&quot;</span>
-
     <span class="tok-c"># fc가 단일 레이어일 경우 리스트로 변환</span>
-
     <span class="tok-k">if</span> <span class="tok-k">not</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>fcs<span class="tok-o">,</span> <span class="tok-b">list</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         fcs <span class="tok-o">=</span> <span class="tok-o">[</span>fcs<span class="tok-o">]</span>
 
-
-
     <span class="tok-c"># scale 텐서를 LN의 디바이스로 이동</span>
-
     scales <span class="tok-o">=</span> scales<span class="tok-o">.</span>to<span class="tok-o">(</span>ln<span class="tok-o">.</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># LayerNorm 파라미터 스케일 조정</span>
-
     <span class="tok-c"># scale factor로 나누어 normalization 강도를 맞춤</span>
-
     ln<span class="tok-o">.</span>weight<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">)</span>
-
     <span class="tok-k">if</span> <span class="tok-b">hasattr</span><span class="tok-o">(</span>ln<span class="tok-o">,</span> <span class="tok-s">&#x27;bias&#x27;</span><span class="tok-o">)</span> <span class="tok-k">and</span> ln<span class="tok-o">.</span>bias <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
         ln<span class="tok-o">.</span>bias<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 후속 Linear layer의 입력 스케일을 보정</span>
-
     <span class="tok-c"># LN 출력이 작아지면, fc 입력 가중치를 동일 비율로 키워서 feature scale 균형 유지</span>
-
     <span class="tok-k">for</span> fc <span class="tok-k">in</span> fcs<span class="tok-o">:</span>
-
         fc<span class="tok-o">.</span>weight<span class="tok-o">.</span>mul_<span class="tok-o">(</span>scales<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># NaN 검증 (안정성 체크)</span>
-
     <span class="tok-k">for</span> p <span class="tok-k">in</span> ln<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">assert</span> torch<span class="tok-o">.</span>isnan<span class="tok-o">(</span>p<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span>
-
     <span class="tok-k">for</span> fc <span class="tok-k">in</span> fcs<span class="tok-o">:</span>
-
         <span class="tok-k">for</span> p <span class="tok-k">in</span> fc<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-k">assert</span> torch<span class="tok-o">.</span>isnan<span class="tok-o">(</span>p<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span>
 
 
-
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> scale_fc_fc<span class="tok-o">(</span>fc1<span class="tok-o">,</span> fc2<span class="tok-o">,</span> scales<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     두 개의 연속된 Linear layer(fc1 → fc2) 간의 스케일을 조정
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">assert</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>fc1<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span>
-
     <span class="tok-k">assert</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>fc2<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span>
-
-
 
     scales <span class="tok-o">=</span> scales<span class="tok-o">.</span>to<span class="tok-o">(</span>fc1<span class="tok-o">.</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># fc1의 출력 채널 방향으로 스케일 보정</span>
-
     <span class="tok-c"># 주석된 라인은 전체 weight에 적용하는 방식 (현재는 마지막 부분만 적용)</span>
-
     fc1<span class="tok-o">.</span>weight<span class="tok-o">[</span><span class="tok-o">-</span>scales<span class="tok-o">.</span>size<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span><span class="tok-o">:</span><span class="tok-o">]</span><span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># bias가 존재할 경우 동일하게 보정</span>
-
     <span class="tok-k">if</span> fc1<span class="tok-o">.</span>bias <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
         fc1<span class="tok-o">.</span>bias<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># fc2의 입력 채널 방향으로 스케일을 곱해 normalization 후 feature scale 복원</span>
-
     fc2<span class="tok-o">.</span>weight<span class="tok-o">.</span>mul_<span class="tok-o">(</span>scales<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># NaN 검증 (안정성 체크)</span>
-
     <span class="tok-k">for</span> p <span class="tok-k">in</span> fc1<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">assert</span> torch<span class="tok-o">.</span>isnan<span class="tok-o">(</span>p<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span>
-
     <span class="tok-k">for</span> p <span class="tok-k">in</span> fc2<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">assert</span> torch<span class="tok-o">.</span>isnan<span class="tok-o">(</span>p<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span>
-
 </code></pre></section><section class="nb-cell nb-code" data-cell="35"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> auto_scale_block<span class="tok-o">(</span>module<span class="tok-o">,</span> name<span class="tok-o">,</span> w_bit<span class="tok-o">,</span>
-
                      q_group_size<span class="tok-o">,</span>
-
                      input_feat<span class="tok-o">)</span><span class="tok-o">:</span>
 
-
-
     <span class="tok-c"># find the best scale ratio</span>
-
     <span class="tok-k">def</span> _search_module_scale<span class="tok-o">(</span>block<span class="tok-o">,</span> linears2scale<span class="tok-o">:</span> <span class="tok-b">list</span><span class="tok-o">,</span> x<span class="tok-o">,</span> kwargs<span class="tok-o">=</span><span class="tok-o">{</span><span class="tok-o">}</span><span class="tok-o">)</span><span class="tok-o">:</span>
 
-
-
         x <span class="tok-o">=</span> x<span class="tok-o">.</span>to<span class="tok-o">(</span><span class="tok-b">next</span><span class="tok-o">(</span>block<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">.</span>device<span class="tok-o">)</span>
-
         <span class="tok-k">with</span> torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             org_out <span class="tok-o">=</span> block<span class="tok-o">(</span>x<span class="tok-o">,</span> <span class="tok-o">**</span>kwargs<span class="tok-o">)</span>
-
             <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>org_out<span class="tok-o">,</span> <span class="tok-b">tuple</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
                 org_out <span class="tok-o">=</span> org_out<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
 
-
-
         s_x <span class="tok-o">=</span> x<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> x<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>mean<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
         s_x <span class="tok-o">=</span> torch<span class="tok-o">.</span>clamp<span class="tok-o">(</span>s_x<span class="tok-o">,</span> <span class="tok-m">1e-5</span><span class="tok-o">)</span>
 
 
-
-
-
         <span class="tok-c"># Step 1: best_error, best_ratio, 및 best_scales를 초기화</span>
-
         best_error <span class="tok-o">=</span> torch<span class="tok-o">.</span>inf
-
         best_ratio <span class="tok-o">=</span> <span class="tok-o">-</span><span class="tok-m">1</span>
-
         best_scales <span class="tok-o">=</span> <span class="tok-m">0</span>
 
 
-
-
-
         n_grid <span class="tok-o">=</span> <span class="tok-m">20</span>
-
         history <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
 
-
-
         org_sd <span class="tok-o">=</span> <span class="tok-o">{</span>k<span class="tok-o">:</span> v<span class="tok-o">.</span>cpu<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-k">for</span> k<span class="tok-o">,</span> v <span class="tok-k">in</span> block<span class="tok-o">.</span>state_dict<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>items<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">}</span>
-
         <span class="tok-k">for</span> ratio <span class="tok-k">in</span> <span class="tok-b">range</span><span class="tok-o">(</span>n_grid<span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-c"># ratio is the \alpha in the formula</span>
-
             ratio <span class="tok-o">=</span> ratio <span class="tok-o">*</span> <span class="tok-m">1</span> <span class="tok-o">/</span> n_grid
-
-
 
             <span class="tok-c">############### YOUR CODE STARTS HERE ###############</span>
 
-
-
             <span class="tok-c"># Step 2: 공식에 따라 스케일 계산</span>
-
             scales <span class="tok-o">=</span>
 
-
-
             <span class="tok-c">############### YOUR CODE ENDS HERE #################</span>
-
             <span class="tok-k">assert</span> scales<span class="tok-o">.</span>shape <span class="tok-o">==</span> s_x<span class="tok-o">.</span>shape
-
-
 
             scales <span class="tok-o">=</span> scales <span class="tok-o">/</span> <span class="tok-o">(</span>scales<span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">*</span> scales<span class="tok-o">.</span><span class="tok-b">min</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">.</span>sqrt<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span>
 
-
-
             <span class="tok-k">for</span> fc <span class="tok-k">in</span> linears2scale<span class="tok-o">:</span>
-
-
 
                 scales <span class="tok-o">=</span> scales<span class="tok-o">.</span>to<span class="tok-o">(</span>fc<span class="tok-o">.</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
 
-
-
                 <span class="tok-c">############### YOUR CODE STARTS HERE ###############</span>
 
-
-
                 <span class="tok-c"># Step 3: scale_factor를 이용해 중요한 가중치 채널의 값을 확대합니다.</span>
-
                 fc<span class="tok-o">.</span>weight<span class="tok-o">.</span>data
-
-
 
                 fc<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> pseudo_quantize_tensor<span class="tok-o">(</span>fc<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">,</span> w_bit<span class="tok-o">,</span> q_group_size<span class="tok-o">)</span>
 
-
-
                 <span class="tok-c"># Step 4: scale_factor를 이용해 중요한 가중치 채널의 값을 다시 축소하세요.</span>
-
                 fc<span class="tok-o">.</span>weight<span class="tok-o">.</span>data
-
-
 
                 <span class="tok-c">############### YOUR CODE ENDS HERE #################</span>
 
-
-
             out <span class="tok-o">=</span> block<span class="tok-o">(</span>x<span class="tok-o">,</span> <span class="tok-o">**</span>kwargs<span class="tok-o">)</span>
-
             <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>out<span class="tok-o">,</span> <span class="tok-b">tuple</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
                 out <span class="tok-o">=</span> out<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
 
-
-
             loss <span class="tok-o">=</span> <span class="tok-o">(</span>org_out <span class="tok-o">-</span> out<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">float</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>pow<span class="tok-o">(</span><span class="tok-m">2</span><span class="tok-o">)</span><span class="tok-o">.</span>mean<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># float prevents overflow</span>
-
             history<span class="tok-o">.</span>append<span class="tok-o">(</span>loss<span class="tok-o">)</span>
-
             is_best <span class="tok-o">=</span> loss <span class="tok-o">&lt;</span> best_error
-
             <span class="tok-k">if</span> is_best<span class="tok-o">:</span>
-
                 best_error <span class="tok-o">=</span> loss
-
                 best_ratio <span class="tok-o">=</span> ratio
-
                 best_scales <span class="tok-o">=</span> scales
-
             block<span class="tok-o">.</span>load_state_dict<span class="tok-o">(</span>org_sd<span class="tok-o">)</span>
 
-
-
         <span class="tok-k">if</span> best_ratio <span class="tok-o">==</span> <span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">:</span>
-
             <span class="tok-b">print</span><span class="tok-o">(</span>history<span class="tok-o">)</span>
-
             <span class="tok-k">raise</span> Exception
-
-
 
         best_scales <span class="tok-o">=</span> best_scales<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span>
 
-
-
         <span class="tok-k">assert</span> torch<span class="tok-o">.</span>isnan<span class="tok-o">(</span>best_scales<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">0</span><span class="tok-o">,</span> best_scales
-
         <span class="tok-k">return</span> best_scales<span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># (1) Self-Attention 입력 부분 (Q, K, V projection)</span>
-
     inp <span class="tok-o">=</span> input_feat<span class="tok-o">[</span>name <span class="tok-o">+</span> <span class="tok-s">&#x27;.self_attn.out_proj&#x27;</span><span class="tok-o">]</span>
-
     inp <span class="tok-o">=</span> torch<span class="tok-o">.</span>cat<span class="tok-o">(</span><span class="tok-o">[</span>x<span class="tok-o">.</span>unsqueeze<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span> <span class="tok-k">for</span> x <span class="tok-k">in</span> inp<span class="tok-o">]</span><span class="tok-o">,</span> dim<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span><span class="tok-o">.</span>unsqueeze<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
     qkv <span class="tok-o">=</span> <span class="tok-o">[</span>module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>q_proj<span class="tok-o">,</span> module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>k_proj<span class="tok-o">,</span> module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>v_proj<span class="tok-o">]</span>
-
     final_scales <span class="tok-o">=</span> _search_module_scale<span class="tok-o">(</span>module<span class="tok-o">.</span>self_attn<span class="tok-o">,</span> qkv<span class="tok-o">,</span> inp<span class="tok-o">)</span>
-
     scale_ln_fcs<span class="tok-o">(</span>module<span class="tok-o">.</span>self_attn_layer_norm<span class="tok-o">,</span> qkv<span class="tok-o">,</span> final_scales<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># (2) Self-Attention 출력 부분 (out_proj)</span>
-
     inp <span class="tok-o">=</span> input_feat<span class="tok-o">[</span>name <span class="tok-o">+</span> <span class="tok-s">&#x27;.self_attn.out_proj&#x27;</span><span class="tok-o">]</span>
-
     inp <span class="tok-o">=</span> torch<span class="tok-o">.</span>cat<span class="tok-o">(</span><span class="tok-o">[</span>x<span class="tok-o">.</span>unsqueeze<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span> <span class="tok-k">for</span> x <span class="tok-k">in</span> inp<span class="tok-o">]</span><span class="tok-o">,</span> dim<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
     final_scales <span class="tok-o">=</span> _search_module_scale<span class="tok-o">(</span>module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>out_proj<span class="tok-o">,</span> <span class="tok-o">[</span>module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>out_proj<span class="tok-o">]</span><span class="tok-o">,</span> inp<span class="tok-o">)</span>
-
     scale_fc_fc<span class="tok-o">(</span>module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>v_proj<span class="tok-o">,</span> module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>out_proj<span class="tok-o">,</span> final_scales<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># (3) Feed-Forward Network 첫 번째 FC (fc1)</span>
-
     inp <span class="tok-o">=</span> input_feat<span class="tok-o">[</span>name <span class="tok-o">+</span> <span class="tok-s">&#x27;.fc1&#x27;</span><span class="tok-o">]</span>
-
     inp <span class="tok-o">=</span> torch<span class="tok-o">.</span>cat<span class="tok-o">(</span><span class="tok-o">[</span>x<span class="tok-o">.</span>unsqueeze<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span> <span class="tok-k">for</span> x <span class="tok-k">in</span> inp<span class="tok-o">]</span><span class="tok-o">,</span> dim<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
     final_scales <span class="tok-o">=</span> _search_module_scale<span class="tok-o">(</span>module<span class="tok-o">.</span>fc1<span class="tok-o">,</span> <span class="tok-o">[</span>module<span class="tok-o">.</span>fc1<span class="tok-o">]</span><span class="tok-o">,</span> inp<span class="tok-o">)</span>
-
     scale_ln_fcs<span class="tok-o">(</span>module<span class="tok-o">.</span>final_layer_norm<span class="tok-o">,</span> module<span class="tok-o">.</span>fc1<span class="tok-o">,</span> final_scales<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># (4) Feed-Forward Network 두 번째 FC (fc2)</span>
-
     inp <span class="tok-o">=</span> input_feat<span class="tok-o">[</span>name <span class="tok-o">+</span> <span class="tok-s">&#x27;.fc2&#x27;</span><span class="tok-o">]</span>
-
     inp <span class="tok-o">=</span> torch<span class="tok-o">.</span>cat<span class="tok-o">(</span><span class="tok-o">[</span>x<span class="tok-o">.</span>unsqueeze<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span> <span class="tok-k">for</span> x <span class="tok-k">in</span> inp<span class="tok-o">]</span><span class="tok-o">,</span> dim<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
     final_scales <span class="tok-o">=</span> _search_module_scale<span class="tok-o">(</span>module<span class="tok-o">.</span>fc2<span class="tok-o">,</span> <span class="tok-o">[</span>module<span class="tok-o">.</span>fc2<span class="tok-o">]</span><span class="tok-o">,</span> inp<span class="tok-o">)</span>
-
     scale_fc_fc<span class="tok-o">(</span>module<span class="tok-o">.</span>fc1<span class="tok-o">,</span> module<span class="tok-o">.</span>fc2<span class="tok-o">,</span> final_scales<span class="tok-o">)</span>
 
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> pseudo_quantize_model_weight_auto_scale<span class="tok-o">(</span>model<span class="tok-o">,</span> w_bit<span class="tok-o">,</span> q_group_size<span class="tok-o">,</span> input_feat<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     OPT 계열 모델 전체에 대해 자동 스케일 조정(auto-scale) 기반 pseudo quantization 수행.
     각 Decoder Layer 단위로 auto_scale_block을 적용.
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">from</span> transformers<span class="tok-o">.</span>models<span class="tok-o">.</span>opt<span class="tok-o">.</span>modeling_opt <span class="tok-k">import</span> OPTDecoderLayer
 
-
-
     <span class="tok-c"># 각 OPTDecoderLayer(Transformer 블록)에 대해 auto scaling 수행</span>
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> module <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>module<span class="tok-o">,</span> OPTDecoderLayer<span class="tok-o">)</span><span class="tok-o">:</span>
-
             auto_scale_block<span class="tok-o">(</span>module<span class="tok-o">,</span> name<span class="tok-o">,</span> w_bit<span class="tok-o">,</span> q_group_size<span class="tok-o">,</span> input_feat<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 모든 Linear layer에 pseudo quantization 최종 적용</span>
-
     <span class="tok-k">for</span> n<span class="tok-o">,</span> m <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span><span class="tok-o">:</span>
-
             m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> pseudo_quantize_tensor<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">,</span> n_bit<span class="tok-o">=</span>w_bit<span class="tok-o">,</span> q_group_size<span class="tok-o">=</span>q_group_size
-
-            <span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-code" data-cell="36"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
+            <span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="36"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
 pseudo_quantize_model_weight_auto_scale<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> w_bit<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> q_group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">,</span> input_feat<span class="tok-o">=</span>input_feat<span class="tok-o">)</span>
-
 llm_model<span class="tok-o">.</span>model_changed <span class="tok-o">=</span> <span class="tok-k">True</span>
 
-
-
 <span class="tok-c"># Evaluate and delete the model</span>
-
 llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="37"><h1>4.2. Weight and Activation Quantization</h1></section><section class="nb-cell nb-markdown" data-cell="38"><p>대형 언어 모델(LLM)은 다양한 작업에서 뛰어난 성능을 보여주고 있지만, 엄청난 모델 크기로 인해 하드웨어적 장벽(메모리 크기)이 높아지고, 토큰 생성 속도가 느려집니다(메모리 대역폭). LLM의 크기와 계산량은 기하급수적으로 증가하고 있는 반면, 메모리 대역폭은 느리게 증가하고 있습니다. 이 격차는 LLM 성능에서 중요한 병목 현상입니다. 이번 실습에서는 <strong>새로운 양자화 알고리즘(AWQ)</strong>을 사용하여 LLM의 메모리 사용량을 줄이고 추론 속도를 가속화하는 방법을 탐구할 것입니다.</p></section><section class="nb-cell nb-markdown" data-cell="39"><p>이전 수업에서는 양자화(Quantization)의 기본 방법들을 배웠습니다.</p>
 <p>양자화에는 두 가지 유형이 있습니다:</p>
 <ul><li>가중치(weight)와 활성화(activation) 모두 양자화</li><li>계산 한계가 있는 시나리오에서 더 유리합니다: 예를 들어 컨텍스트 단계나 대규모 배치 추론</li><li>예시: SmoothQuant(W8A8 quantization)</li><li>가중치(weight)만 양자화</li><li>메모리 한계가 있는 시나리오에서 더 유리합니다: 예를 들어 디코딩 단계나 단일 배치 추론.</li><li>예시: AWQ(W4A16 quantization)</li></ul></section><section class="nb-cell nb-markdown" data-cell="40"><p>이 노트북에서는 OPT-125m 모델을 사용하여 SmoothQuant가 가중치와 활성화 모두에 8비트를 사용하여 FP16 모델과 동일한 정확도를 달성할 수 있음을 보여줍니다. SmoothQuant는 Linear layer에서 완전한 INT8 GEMM을 가능하게 하고, 이상값을 나타내기 위해 고정밀도 숫자를 요구하지 않습니다.</p></section><section class="nb-cell nb-markdown" data-cell="41"><p>Uniform quantization 은 실수 값을 range$[\beta, \alpha]$에서 $[0, 2^{b} - 1]$로 매핑하는 것입니다.</p>
@@ -1222,368 +652,197 @@ llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>d
 <p>아래 코드는 의사 양자화(pseudo quantization)을 위한 클래스입니다.</p>
 <p>Pseudo Quantization는 모델의 weight와 activation을 실제로 양자화하지 않고, 양자화의 영향을 시뮬레이션하기 위해 사용됩니다. (즉, 가장 가까운 양자화된 값으로 반올림한 다음, <strong>다시 부동 소수점으로 복원(dequantizing)</strong>하는 것입니다.)</p>
 <p>이 노트북에서는 실제 연산에서는 FP16을 사용하여 8비트 dynamic weight and activation qaunitzation을 시뮬레이션 합니다.</p></section><section class="nb-cell nb-code" data-cell="43"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">class</span> W8A8Linear<span class="tok-o">(</span>nn<span class="tok-o">.</span>Module<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     8-bit Weight(A) × 8-bit Activation(A) 양자화 시뮬레이션용 Linear Layer.
     실제 연산은 FP16으로 수행되지만, 연산 전후에 quantize/dequantize 단계를 통해
     8-bit 정밀도의 효과를 모사
     &quot;&quot;&quot;</span>
 
-
-
     <span class="tok-k">def</span> __init__<span class="tok-o">(</span>
-
         self<span class="tok-o">,</span>
-
         in_features<span class="tok-o">,</span>
-
         out_features<span class="tok-o">,</span>
-
         bias<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">,</span>
-
         act_quant<span class="tok-o">=</span><span class="tok-s">&quot;per_token&quot;</span><span class="tok-o">,</span>
-
         quantize_output<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span>
-
         quantize_bits<span class="tok-o">=</span><span class="tok-m">8</span>
-
     <span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-b">super</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>__init__<span class="tok-o">(</span><span class="tok-o">)</span>
-
         self<span class="tok-o">.</span>in_features <span class="tok-o">=</span> in_features
-
         self<span class="tok-o">.</span>out_features <span class="tok-o">=</span> out_features
 
-
-
         <span class="tok-c"># Weight 초기화 (FP16)</span>
-
         self<span class="tok-o">.</span>register_buffer<span class="tok-o">(</span>
-
             <span class="tok-s">&quot;weight&quot;</span><span class="tok-o">,</span>
-
             torch<span class="tok-o">.</span>randn<span class="tok-o">(</span>
-
                 self<span class="tok-o">.</span>out_features<span class="tok-o">,</span>
-
                 self<span class="tok-o">.</span>in_features<span class="tok-o">,</span>
-
                 dtype<span class="tok-o">=</span>torch<span class="tok-o">.</span>float16<span class="tok-o">,</span>
-
                 requires_grad<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span>
-
             <span class="tok-o">)</span><span class="tok-o">,</span>
-
         <span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># Bias 초기화 (FP16)</span>
-
         <span class="tok-k">if</span> bias<span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>register_buffer<span class="tok-o">(</span>
-
                 <span class="tok-s">&quot;bias&quot;</span><span class="tok-o">,</span>
-
                 torch<span class="tok-o">.</span>zeros<span class="tok-o">(</span>
-
                     <span class="tok-o">(</span><span class="tok-m">1</span><span class="tok-o">,</span> self<span class="tok-o">.</span>out_features<span class="tok-o">)</span><span class="tok-o">,</span> dtype<span class="tok-o">=</span>torch<span class="tok-o">.</span>float16<span class="tok-o">,</span> requires_grad<span class="tok-o">=</span><span class="tok-k">False</span>
-
                 <span class="tok-o">)</span><span class="tok-o">,</span>
-
             <span class="tok-o">)</span>
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>register_buffer<span class="tok-o">(</span><span class="tok-s">&quot;bias&quot;</span><span class="tok-o">,</span> <span class="tok-k">None</span><span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># 입력 activation quantization 방식 선택</span>
-
         <span class="tok-c"># per_token: 토큰별로 스케일 계산</span>
-
         <span class="tok-c"># per_tensor: 전체 텐서 단위로 스케일 계산</span>
-
         <span class="tok-k">if</span> act_quant <span class="tok-o">==</span> <span class="tok-s">&quot;per_token&quot;</span><span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>act_quant_name <span class="tok-o">=</span> <span class="tok-s">&quot;per_token&quot;</span>
-
             self<span class="tok-o">.</span>act_quant <span class="tok-o">=</span> partial<span class="tok-o">(</span>quantize_activation_per_token_absmax<span class="tok-o">,</span> n_bits<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span>
-
         <span class="tok-k">elif</span> act_quant <span class="tok-o">==</span> <span class="tok-s">&quot;per_tensor&quot;</span><span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>act_quant_name <span class="tok-o">=</span> <span class="tok-s">&quot;per_tensor&quot;</span>
-
             self<span class="tok-o">.</span>act_quant <span class="tok-o">=</span> partial<span class="tok-o">(</span>quantize_activation_per_tensor_absmax<span class="tok-o">,</span> n_bits<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span>
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             <span class="tok-k">raise</span> ValueError<span class="tok-o">(</span>f&quot;Invalid act_quant: <span class="tok-o">{</span>act_quant<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># 출력 activation quantization 옵션 (예: BMM 입력용)</span>
-
         <span class="tok-k">if</span> quantize_output<span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>output_quant_name <span class="tok-o">=</span> self<span class="tok-o">.</span>act_quant_name
-
             self<span class="tok-o">.</span>output_quant <span class="tok-o">=</span> self<span class="tok-o">.</span>act_quant
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>output_quant_name <span class="tok-o">=</span> <span class="tok-s">&quot;None&quot;</span>
-
             self<span class="tok-o">.</span>output_quant <span class="tok-o">=</span> <span class="tok-k">lambda</span> x<span class="tok-o">:</span> x  <span class="tok-c"># 출력 quantization 미적용</span>
-
-
 
         self<span class="tok-o">.</span>quantize_bits <span class="tok-o">=</span> quantize_bits
 
-
-
     <span class="tok-k">def</span> to<span class="tok-o">(</span>self<span class="tok-o">,</span> <span class="tok-o">*</span>args<span class="tok-o">,</span> <span class="tok-o">**</span>kwargs<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-c"># .to() 호출 시 weight와 bias도 동일한 디바이스로 이동</span>
-
         <span class="tok-b">super</span><span class="tok-o">(</span>W8A8Linear<span class="tok-o">,</span> self<span class="tok-o">)</span><span class="tok-o">.</span>to<span class="tok-o">(</span><span class="tok-o">*</span>args<span class="tok-o">,</span> <span class="tok-o">**</span>kwargs<span class="tok-o">)</span>
-
         self<span class="tok-o">.</span>weight <span class="tok-o">=</span> self<span class="tok-o">.</span>weight<span class="tok-o">.</span>to<span class="tok-o">(</span><span class="tok-o">*</span>args<span class="tok-o">,</span> <span class="tok-o">**</span>kwargs<span class="tok-o">)</span>
-
         <span class="tok-k">if</span> self<span class="tok-o">.</span>bias <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
             self<span class="tok-o">.</span>bias <span class="tok-o">=</span> self<span class="tok-o">.</span>bias<span class="tok-o">.</span>to<span class="tok-o">(</span><span class="tok-o">*</span>args<span class="tok-o">,</span> <span class="tok-o">**</span>kwargs<span class="tok-o">)</span>
-
         <span class="tok-k">return</span> self
 
-
-
     <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
     <span class="tok-k">def</span> forward<span class="tok-o">(</span>self<span class="tok-o">,</span> x<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;
         순전파 (forward pass)
         1. 입력 activation quantization
         2. Linear 연산
         3. 출력 quantization
         &quot;&quot;&quot;</span>
-
         q_x <span class="tok-o">=</span> self<span class="tok-o">.</span>act_quant<span class="tok-o">(</span>x<span class="tok-o">)</span>
-
         y <span class="tok-o">=</span> torch<span class="tok-o">.</span>functional<span class="tok-o">.</span>F<span class="tok-o">.</span>linear<span class="tok-o">(</span>q_x<span class="tok-o">,</span> self<span class="tok-o">.</span>weight<span class="tok-o">,</span> self<span class="tok-o">.</span>bias<span class="tok-o">)</span>
-
         q_y <span class="tok-o">=</span> self<span class="tok-o">.</span>output_quant<span class="tok-o">(</span>y<span class="tok-o">)</span>
-
         <span class="tok-k">return</span> q_y
 
-
-
     <span class="tok-o">@</span>staticmethod
-
     <span class="tok-k">def</span> from_float<span class="tok-o">(</span>
-
         module<span class="tok-o">,</span> weight_quant<span class="tok-o">=</span><span class="tok-s">&quot;per_channel&quot;</span><span class="tok-o">,</span> act_quant<span class="tok-o">=</span><span class="tok-s">&quot;per_token&quot;</span><span class="tok-o">,</span> quantize_output<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span> quantize_bits<span class="tok-o">=</span><span class="tok-m">8</span>
-
     <span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;
         FP16 Linear 모듈을 받아, W8A8Linear로 변환
         Weight를 8-bit로 quantize하고, activation quantization 함수를 연결함.
         &quot;&quot;&quot;</span>
-
         <span class="tok-k">assert</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>module<span class="tok-o">,</span> torch<span class="tok-o">.</span>nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span>
-
         new_module <span class="tok-o">=</span> W8A8Linear<span class="tok-o">(</span>
-
             module<span class="tok-o">.</span>in_features<span class="tok-o">,</span>
-
             module<span class="tok-o">.</span>out_features<span class="tok-o">,</span>
-
             module<span class="tok-o">.</span>bias <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">,</span>
-
             act_quant<span class="tok-o">=</span>act_quant<span class="tok-o">,</span>
-
             quantize_output<span class="tok-o">=</span>quantize_output<span class="tok-o">,</span>
-
         <span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># Weight quantization 방식 선택</span>
-
         <span class="tok-k">if</span> weight_quant <span class="tok-o">==</span> <span class="tok-s">&quot;per_channel&quot;</span><span class="tok-o">:</span>
-
             <span class="tok-c"># 출력 채널별 스케일 계산</span>
-
             new_module<span class="tok-o">.</span>weight <span class="tok-o">=</span> quantize_weight_per_channel_absmax<span class="tok-o">(</span>
-
                 module<span class="tok-o">.</span>weight<span class="tok-o">,</span> n_bits<span class="tok-o">=</span>new_module<span class="tok-o">.</span>quantize_bits
-
             <span class="tok-o">)</span>
-
         <span class="tok-k">elif</span> weight_quant <span class="tok-o">==</span> <span class="tok-s">&quot;per_tensor&quot;</span><span class="tok-o">:</span>
-
             <span class="tok-c"># 전체 텐서 단위 스케일 계산</span>
-
             new_module<span class="tok-o">.</span>weight <span class="tok-o">=</span> quantize_weight_per_tensor_absmax<span class="tok-o">(</span>
-
                 module<span class="tok-o">.</span>weight<span class="tok-o">,</span> n_bits<span class="tok-o">=</span>new_module<span class="tok-o">.</span>quantize_bits
-
             <span class="tok-o">)</span>
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             <span class="tok-k">raise</span> ValueError<span class="tok-o">(</span>f&quot;Invalid weight_quant: <span class="tok-o">{</span>weight_quant<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
-
-
 
         new_module<span class="tok-o">.</span>weight_quant_name <span class="tok-o">=</span> weight_quant
 
-
-
         <span class="tok-c"># bias 복사</span>
-
         <span class="tok-k">if</span> module<span class="tok-o">.</span>bias <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
             new_module<span class="tok-o">.</span>bias <span class="tok-o">=</span> module<span class="tok-o">.</span>bias
-
-
 
         <span class="tok-k">return</span> new_module
 
-
-
     <span class="tok-k">def</span> __repr__<span class="tok-o">(</span>self<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">return</span> <span class="tok-o">(</span>
-
             f&quot;W8A8Linear(<span class="tok-o">{</span>self<span class="tok-o">.</span>in_features<span class="tok-o">}</span>, <span class="tok-o">{</span>self<span class="tok-o">.</span>out_features<span class="tok-o">}</span>, &quot;
-
             f&quot;bias=<span class="tok-o">{</span>self<span class="tok-o">.</span>bias <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">}</span>, &quot;
-
             f&quot;weight_quant=<span class="tok-o">{</span>self<span class="tok-o">.</span>weight_quant_name<span class="tok-o">}</span>, &quot;
-
             f&quot;act_quant=<span class="tok-o">{</span>self<span class="tok-o">.</span>act_quant_name<span class="tok-o">}</span>, &quot;
-
             f&quot;output_quant=<span class="tok-o">{</span>self<span class="tok-o">.</span>output_quant_name<span class="tok-o">}</span>)&quot;
-
-        <span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-code" data-cell="44"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
+        <span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="44"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
 <span class="tok-k">def</span> quantize_weight_per_channel_absmax<span class="tok-o">(</span>w<span class="tok-o">,</span> n_bits<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     weight per-channel quantization (출력 채널별 최대값 스케일)
     &quot;&quot;&quot;</span>
-
     <span class="tok-c"># w: (out_features, in_features)</span>
-
     scales <span class="tok-o">=</span> w<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
-
     q_max <span class="tok-o">=</span> <span class="tok-m">2</span> <span class="tok-o">**</span> <span class="tok-o">(</span>n_bits <span class="tok-o">-</span> <span class="tok-m">1</span><span class="tok-o">)</span> <span class="tok-o">-</span> <span class="tok-m">1</span>
-
     scales<span class="tok-o">.</span>clamp_<span class="tok-o">(</span><span class="tok-b">min</span><span class="tok-o">=</span><span class="tok-m">1e-5</span><span class="tok-o">)</span><span class="tok-o">.</span>div_<span class="tok-o">(</span>q_max<span class="tok-o">)</span>
-
     w<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">)</span><span class="tok-o">.</span>round_<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>mul_<span class="tok-o">(</span>scales<span class="tok-o">)</span>
-
     <span class="tok-k">return</span> w
 
 
-
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> quantize_weight_per_tensor_absmax<span class="tok-o">(</span>w<span class="tok-o">,</span> n_bits<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     weight per-tensor quantization (전체 텐서의 absmax 기준)
     &quot;&quot;&quot;</span>
-
     scales <span class="tok-o">=</span> w<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span><span class="tok-o">)</span>
-
     q_max <span class="tok-o">=</span> <span class="tok-m">2</span> <span class="tok-o">**</span> <span class="tok-o">(</span>n_bits <span class="tok-o">-</span> <span class="tok-m">1</span><span class="tok-o">)</span> <span class="tok-o">-</span> <span class="tok-m">1</span>
-
     scales<span class="tok-o">.</span>clamp_<span class="tok-o">(</span><span class="tok-b">min</span><span class="tok-o">=</span><span class="tok-m">1e-5</span><span class="tok-o">)</span><span class="tok-o">.</span>div_<span class="tok-o">(</span>q_max<span class="tok-o">)</span>
-
     w<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">)</span><span class="tok-o">.</span>round_<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>mul_<span class="tok-o">(</span>scales<span class="tok-o">)</span>
-
     <span class="tok-k">return</span> w
 
 
-
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> quantize_activation_per_token_absmax<span class="tok-o">(</span>t<span class="tok-o">,</span> n_bits<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     activation per-token quantization:
     각 토큰(=시퀀스 단위)마다 absmax 기준으로 스케일링.
     &quot;&quot;&quot;</span>
-
     t_shape <span class="tok-o">=</span> t<span class="tok-o">.</span>shape
-
     t<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> t_shape<span class="tok-o">[</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
     scales <span class="tok-o">=</span> t<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
-
     q_max <span class="tok-o">=</span> <span class="tok-m">2</span> <span class="tok-o">**</span> <span class="tok-o">(</span>n_bits <span class="tok-o">-</span> <span class="tok-m">1</span><span class="tok-o">)</span> <span class="tok-o">-</span> <span class="tok-m">1</span>
-
     scales<span class="tok-o">.</span>clamp_<span class="tok-o">(</span><span class="tok-b">min</span><span class="tok-o">=</span><span class="tok-m">1e-5</span><span class="tok-o">)</span><span class="tok-o">.</span>div_<span class="tok-o">(</span>q_max<span class="tok-o">)</span>
-
     t<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">)</span><span class="tok-o">.</span>round_<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>mul_<span class="tok-o">(</span>scales<span class="tok-o">)</span>
-
     <span class="tok-k">return</span> t
 
 
-
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> quantize_activation_per_tensor_absmax<span class="tok-o">(</span>t<span class="tok-o">,</span> n_bits<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     activation per-tensor quantization:
     전체 텐서의 absmax를 기준으로 스케일링.
     &quot;&quot;&quot;</span>
-
     t_shape <span class="tok-o">=</span> t<span class="tok-o">.</span>shape
-
     t<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> t_shape<span class="tok-o">[</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
     scales <span class="tok-o">=</span> t<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span><span class="tok-o">)</span>
-
     q_max <span class="tok-o">=</span> <span class="tok-m">2</span> <span class="tok-o">**</span> <span class="tok-o">(</span>n_bits <span class="tok-o">-</span> <span class="tok-m">1</span><span class="tok-o">)</span> <span class="tok-o">-</span> <span class="tok-m">1</span>
-
     scales<span class="tok-o">.</span>clamp_<span class="tok-o">(</span><span class="tok-b">min</span><span class="tok-o">=</span><span class="tok-m">1e-5</span><span class="tok-o">)</span><span class="tok-o">.</span>div_<span class="tok-o">(</span>q_max<span class="tok-o">)</span>
-
     t<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">)</span><span class="tok-o">.</span>round_<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>mul_<span class="tok-o">(</span>scales<span class="tok-o">)</span>
-
     <span class="tok-k">return</span> t
 
-
-
 <span class="tok-k">def</span> quantize_opt<span class="tok-o">(</span>
-
     model<span class="tok-o">,</span>
-
     weight_quant<span class="tok-o">=</span><span class="tok-s">&quot;per_tensor&quot;</span><span class="tok-o">,</span>
-
     act_quant<span class="tok-o">=</span><span class="tok-s">&quot;per_tensor&quot;</span><span class="tok-o">,</span>
-
     quantize_bmm_input<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">,</span>
-
     quantize_bits<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">,</span>
-
 <span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     OPT 모델에 W8A8 quantization을 적용하는 함수.
     Linear 및 Attention projection 계층을 W8A8Linear로 교체함.
@@ -1592,119 +851,62 @@ llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>d
     - act_quant: &#x27;per_token&#x27; 또는 &#x27;per_tensor&#x27;
     - quantize_bmm_input: True이면 q_proj, k_proj, v_proj 출력도 quantize하여 BMM 입력 시뮬레이션
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">from</span> transformers<span class="tok-o">.</span>models<span class="tok-o">.</span>opt<span class="tok-o">.</span>modeling_opt <span class="tok-k">import</span> OPTAttention<span class="tok-o">,</span> OPTDecoderLayer
 
-
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> m <span class="tok-k">in</span> model<span class="tok-o">.</span>model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> OPTDecoderLayer<span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-c"># Feed-Forward 계층 (fc1, fc2) quantization</span>
-
             m<span class="tok-o">.</span>fc1 <span class="tok-o">=</span> W8A8Linear<span class="tok-o">.</span>from_float<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>fc1<span class="tok-o">,</span>
-
                 weight_quant<span class="tok-o">=</span>weight_quant<span class="tok-o">,</span>
-
                 act_quant<span class="tok-o">=</span>act_quant<span class="tok-o">,</span>
-
                 quantize_bits<span class="tok-o">=</span>quantize_bits<span class="tok-o">,</span>
-
             <span class="tok-o">)</span>
-
             m<span class="tok-o">.</span>fc2 <span class="tok-o">=</span> W8A8Linear<span class="tok-o">.</span>from_float<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>fc2<span class="tok-o">,</span>
-
                 weight_quant<span class="tok-o">=</span>weight_quant<span class="tok-o">,</span>
-
                 act_quant<span class="tok-o">=</span>act_quant<span class="tok-o">,</span>
-
                 quantize_bits<span class="tok-o">=</span>quantize_bits<span class="tok-o">,</span>
-
             <span class="tok-o">)</span>
-
-
 
         <span class="tok-k">elif</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> OPTAttention<span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-c"># Attention 내부 q, k, v, out projection quantization</span>
-
             <span class="tok-c"># quantize_bmm_input=True이면 BMM 입력용으로 q/k/v 출력도 quantize 시뮬레이션</span>
-
             m<span class="tok-o">.</span>q_proj <span class="tok-o">=</span> W8A8Linear<span class="tok-o">.</span>from_float<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>q_proj<span class="tok-o">,</span>
-
                 weight_quant<span class="tok-o">=</span>weight_quant<span class="tok-o">,</span>
-
                 act_quant<span class="tok-o">=</span>act_quant<span class="tok-o">,</span>
-
                 quantize_output<span class="tok-o">=</span>quantize_bmm_input<span class="tok-o">,</span>
-
                 quantize_bits<span class="tok-o">=</span>quantize_bits<span class="tok-o">,</span>
-
             <span class="tok-o">)</span>
-
             m<span class="tok-o">.</span>k_proj <span class="tok-o">=</span> W8A8Linear<span class="tok-o">.</span>from_float<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>k_proj<span class="tok-o">,</span>
-
                 weight_quant<span class="tok-o">=</span>weight_quant<span class="tok-o">,</span>
-
                 act_quant<span class="tok-o">=</span>act_quant<span class="tok-o">,</span>
-
                 quantize_output<span class="tok-o">=</span>quantize_bmm_input<span class="tok-o">,</span>
-
                 quantize_bits<span class="tok-o">=</span>quantize_bits<span class="tok-o">,</span>
-
             <span class="tok-o">)</span>
-
             m<span class="tok-o">.</span>v_proj <span class="tok-o">=</span> W8A8Linear<span class="tok-o">.</span>from_float<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>v_proj<span class="tok-o">,</span>
-
                 weight_quant<span class="tok-o">=</span>weight_quant<span class="tok-o">,</span>
-
                 act_quant<span class="tok-o">=</span>act_quant<span class="tok-o">,</span>
-
                 quantize_output<span class="tok-o">=</span>quantize_bmm_input<span class="tok-o">,</span>
-
                 quantize_bits<span class="tok-o">=</span>quantize_bits<span class="tok-o">,</span>
-
             <span class="tok-o">)</span>
-
             m<span class="tok-o">.</span>out_proj <span class="tok-o">=</span> W8A8Linear<span class="tok-o">.</span>from_float<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>out_proj<span class="tok-o">,</span>
-
                 weight_quant<span class="tok-o">=</span>weight_quant<span class="tok-o">,</span>
-
                 act_quant<span class="tok-o">=</span>act_quant<span class="tok-o">,</span>
-
                 quantize_bits<span class="tok-o">=</span>quantize_bits<span class="tok-o">,</span>
-
             <span class="tok-o">)</span>
-
-
 
     <span class="tok-k">return</span> model
-
 </code></pre></section><section class="nb-cell nb-markdown" data-cell="45"><p>이제 quantized 8-bit 모델의 혼란도(perplexity)와 크기를 평가해 봅시다.</p></section><section class="nb-cell nb-code" data-cell="46"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
 model_w8a8 <span class="tok-o">=</span> quantize_opt<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> quantize_bits<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span>model_w8a8<span class="tok-o">)</span>
-
 llm_model<span class="tok-o">.</span>model_change<span class="tok-o">(</span>model_w8a8<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Evaluate and delete the model</span>
-
 llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="47"><p>모델 크기가 줄어든 것은 확인할 수 있지만, 혼란도(perplexity)는 약간 증가했습니다.</p></section><section class="nb-cell nb-markdown" data-cell="48"><p>AWQ의 관찰에서와 마찬가지로, LLM의 활성화(activations)에서 일부 채널에 <strong>아웃라이어(outliers)</strong>가 소량 발생하고 있습니다. 특정 채널에 아웃라이어가 있는 경우, 이는 <strong>모든 토큰에서 지속적으로 나타납니다.</strong></p>
 <p>주어진 토큰에 대한 채널 간의 분산(variance)은 크지만(일부 채널의 활성화는 매우 크고, 대부분은 작습니다), 특정 채널의 크기(magnitude)가 토큰 간에 가지는 분산은 작습니다(아웃라이어 채널은 지속적으로 큽니다).</p>
 <p>Smoothquant 논문의 관찰에 따르면, 이러한 현상은 activation에서만 발견되는 현상이며, weight에서는 발견되지 않습니다.</p>
@@ -1724,52 +926,30 @@ llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>d
 <p>Attention Output → LayerNorm → FC1 → 활성화 함수 (ReLU, GELU 등) → FC2 → Output</p>
 <p>그러므로 Transformer의 레이어에서 LayerNorm의 가중치에 스케일링 팩터 $s$를 나누고, FC의 가중치에 스케일링 팩터 $s$를 곱하면 weight에는 s를 곱하고, activation에는 s를 나누는 효과를 얻을 수 있습니다.</p>
 <p>아래 코드를 수정하여 LayerNorm의 가중치에 스케일링 팩터 $s$를 나누고, FC의 가중치에 스케일링 팩터 $s$를 곱해주세요.</p></section><section class="nb-cell nb-code" data-cell="51"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> smooth_lm_by_scale<span class="tok-o">(</span>model<span class="tok-o">,</span> scale<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     LLM(OPT 모델)의 각 Transformer Block에 대해 LayerNorm과 Linear layer 를 smoothing 하는 함수.
     - self-attention 블록의 (LN, q/k/v projection) 연결 구조와 feed-forward 블록의 (LN, fc1) 연결 구조에 동일한 스케일을 적용.
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> module <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>module<span class="tok-o">,</span> OPTDecoderLayer<span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-c"># Self-Attention 부분 smoothing</span>
-
             attn_ln <span class="tok-o">=</span> module<span class="tok-o">.</span>self_attn_layer_norm
-
             qkv <span class="tok-o">=</span> <span class="tok-o">[</span>
-
                 module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>q_proj<span class="tok-o">,</span>
-
                 module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>k_proj<span class="tok-o">,</span>
-
                 module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>v_proj<span class="tok-o">,</span>
-
             <span class="tok-o">]</span>
-
             smooth_ln_fcs_by_scale<span class="tok-o">(</span>attn_ln<span class="tok-o">,</span> qkv<span class="tok-o">,</span> scale<span class="tok-o">)</span>
 
-
-
             <span class="tok-c"># Feed-Forward 부분 smoothing</span>
-
             ffn_ln <span class="tok-o">=</span> module<span class="tok-o">.</span>final_layer_norm
-
             fc1 <span class="tok-o">=</span> module<span class="tok-o">.</span>fc1
-
             smooth_ln_fcs_by_scale<span class="tok-o">(</span>ffn_ln<span class="tok-o">,</span> fc1<span class="tok-o">,</span> scale<span class="tok-o">)</span>
 
 
-
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> smooth_ln_fcs_by_scale<span class="tok-o">(</span>ln<span class="tok-o">,</span> fcs<span class="tok-o">,</span> scale<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     LayerNorm(LN)과 그에 연결된 Fully Connected layer(FC)들 간의 파라미터 스케일을 맞추어 모델의 출력 분포를 안정화시키는 함수.
 
@@ -1779,63 +959,34 @@ llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>d
 
     즉, forward 상에서 전체 스케일은 유지되면서 내부 파라미터 분포만 조정됨.
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">if</span> <span class="tok-k">not</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>fcs<span class="tok-o">,</span> <span class="tok-b">list</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         fcs <span class="tok-o">=</span> <span class="tok-o">[</span>fcs<span class="tok-o">]</span>
-
     <span class="tok-k">assert</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>ln<span class="tok-o">,</span> nn<span class="tok-o">.</span>LayerNorm<span class="tok-o">)</span>
-
     <span class="tok-k">for</span> fc <span class="tok-k">in</span> fcs<span class="tok-o">:</span>
-
         <span class="tok-k">assert</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>fc<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span>
 
-
-
     <span class="tok-c">############### YOUR CODE STARTS HERE ###############</span>
-
     <span class="tok-c"># Step 1: layernorm의 weight와 bias를 scale로 나누어주세요.</span>
-
     <span class="tok-c"># div_() 함수는 텐서 자체를 스케일로 나누는 인플레이스 연산</span>
-
     ln<span class="tok-o">.</span>weight
-
     ln<span class="tok-o">.</span>bias
-
     <span class="tok-c">############### YOUR CODE ENDS HERE #################</span>
 
-
-
     <span class="tok-k">for</span> fc <span class="tok-k">in</span> fcs<span class="tok-o">:</span>
-
         <span class="tok-c">############### YOUR CODE STARTS HERE ###############</span>
-
         <span class="tok-c"># Step 2: fc의 weight에 scale을 곱해주세요.</span>
-
         <span class="tok-c"># mul_() 함수는 텐서 자체에 스케일을 곱하는 인플레이스 연산</span>
-
         fc<span class="tok-o">.</span>weight
-
         <span class="tok-c">############### YOUR CODE ENDS HERE #################</span>
-
 </code></pre></section><section class="nb-cell nb-markdown" data-cell="52"><p>스케일링을 통해서 가중치와 활성화의 양자화 난이도를 적절히 분배하고, 가중치와 활성화를 모두 8bit로 유지할 수 있었습니다.</p></section><section class="nb-cell nb-markdown" data-cell="53"><p>이번에는 코드에서 서로 다른 다양한 스케일링 팩터 $s$(예: 0.001, 0.01, 1)을 시도하고 혼란도(perplexity)의 변화를 관찰해보겠습니다.</p></section><section class="nb-cell nb-code" data-cell="54"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">for</span> scale_factor <span class="tok-k">in</span> <span class="tok-o">[</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-m">10</span><span class="tok-o">,</span> <span class="tok-m">100</span><span class="tok-o">,</span> <span class="tok-m">1000</span><span class="tok-o">]</span><span class="tok-o">:</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;=========== Scale_factor : <span class="tok-o">{</span>scale_factor<span class="tok-o">}</span> ===========&quot;<span class="tok-o">)</span>
-
     llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
     smooth_lm_by_scale<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span>scale_factor<span class="tok-o">)</span>
-
     model <span class="tok-o">=</span> quantize_opt<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">)</span>
-
     llm_model<span class="tok-o">.</span>model_change<span class="tok-o">(</span>model<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># Evaluate the model</span>
-
-    llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="55"><h2>[실습 4] Scale factor sampling</h2>
+    llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="55"><h2>[실습 4] Scale factor sampling</h2>
 <p>스케일링 팩터 $s$값의 설정에 따라 혼란도(perplexity)가 먼저 변화하는 것을 관찰했나요?</p>
 <p>우리의 목표는 각 채널별 스케일링 팩터 s를 선택하여  X̂ = Xdiag(s)⁻¹가 양자화하기 쉽도록 만드는 것입니다.</p>
 <p>양자화 오류를 줄이기 위해 모든 채널의 유효 양자화 비트를 늘려야 합니다.</p>
@@ -1845,233 +996,121 @@ llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>d
 <p>우리는 weight와 activation의 양자화 난이도 사이에서 균형을 맞추기 위해 스케일링 팩터 s를 다음과 같이 설정합니다.</p>
 <p>$s = \max(|X|)^{\alpha} / \max(|W|)^{1-\alpha}$</p>
 <p>아래 코드를 수정하여 스케일링 팩터 s를 위의 식과 같이 설정해주세요.</p></section><section class="nb-cell nb-code" data-cell="56"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> smooth_ln_fcs<span class="tok-o">(</span>ln<span class="tok-o">,</span> fcs<span class="tok-o">,</span> act_scales<span class="tok-o">,</span> alpha<span class="tok-o">=</span><span class="tok-m">0.5</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-k">if</span> <span class="tok-k">not</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>fcs<span class="tok-o">,</span> <span class="tok-b">list</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         fcs <span class="tok-o">=</span> <span class="tok-o">[</span>fcs<span class="tok-o">]</span>
-
     <span class="tok-k">assert</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>ln<span class="tok-o">,</span> nn<span class="tok-o">.</span>LayerNorm<span class="tok-o">)</span>
-
     <span class="tok-k">for</span> fc <span class="tok-k">in</span> fcs<span class="tok-o">:</span>
-
         <span class="tok-k">assert</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>fc<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span>
-
         <span class="tok-k">assert</span> ln<span class="tok-o">.</span>weight<span class="tok-o">.</span>numel<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">==</span> fc<span class="tok-o">.</span>in_features <span class="tok-o">==</span> act_scales<span class="tok-o">.</span>numel<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     device<span class="tok-o">,</span> dtype <span class="tok-o">=</span> fcs<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span><span class="tok-o">.</span>weight<span class="tok-o">.</span>device<span class="tok-o">,</span> fcs<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span><span class="tok-o">.</span>weight<span class="tok-o">.</span>dtype
-
     act_scales <span class="tok-o">=</span> act_scales<span class="tok-o">.</span>to<span class="tok-o">(</span>device<span class="tok-o">=</span>device<span class="tok-o">,</span> dtype<span class="tok-o">=</span>dtype<span class="tok-o">)</span>
-
     weight_scales <span class="tok-o">=</span> torch<span class="tok-o">.</span>cat<span class="tok-o">(</span>
-
         <span class="tok-o">[</span>fc<span class="tok-o">.</span>weight<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span> <span class="tok-k">for</span> fc <span class="tok-k">in</span> fcs<span class="tok-o">]</span><span class="tok-o">,</span> dim<span class="tok-o">=</span><span class="tok-m">0</span>
-
     <span class="tok-o">)</span>
-
     weight_scales <span class="tok-o">=</span> weight_scales<span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span><span class="tok-o">.</span>clamp<span class="tok-o">(</span><span class="tok-b">min</span><span class="tok-o">=</span><span class="tok-m">1e-5</span><span class="tok-o">)</span>
 
-
-
     scales <span class="tok-o">=</span> <span class="tok-o">(</span>
-
         <span class="tok-c">############### YOUR CODE STARTS HERE ###############</span>
-
         <span class="tok-c">#Activation Scales 값과 Weight Scales 값에 alpha를 적절히 거듭제곱해주어야 합니다.</span>
 
-
-
         <span class="tok-c">############### YOUR CODE ENDS HERE #################</span>
-
     <span class="tok-o">)</span>
-
-
 
     scales<span class="tok-o">.</span>clamp<span class="tok-o">(</span><span class="tok-b">min</span><span class="tok-o">=</span><span class="tok-m">1e-5</span><span class="tok-o">)</span><span class="tok-o">.</span>to<span class="tok-o">(</span>device<span class="tok-o">)</span><span class="tok-o">.</span>to<span class="tok-o">(</span>dtype<span class="tok-o">)</span>
 
-
-
     ln<span class="tok-o">.</span>weight<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">)</span>
-
     ln<span class="tok-o">.</span>bias<span class="tok-o">.</span>div_<span class="tok-o">(</span>scales<span class="tok-o">)</span>
 
-
-
     <span class="tok-k">for</span> fc <span class="tok-k">in</span> fcs<span class="tok-o">:</span>
-
         fc<span class="tok-o">.</span>weight<span class="tok-o">.</span>mul_<span class="tok-o">(</span>scales<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
 </code></pre></section><section class="nb-cell nb-markdown" data-cell="57"><p>여기서 활성화 범위는 동적이며 입력 샘플에 따라 달라집니다.</p>
 <p>사전 훈련 데이터 세트의 보정 샘플을 사용하여 활성화 채널의 크기를 추정해보겠습니다.</p>
 <p>아래 코드를 실행하면 512개의 사전 훈련 샘플 데이터 세트를 통해 자동으로 적절한 스케일링 팩터 $s$값을 찾아 양자화를 진행합니다.</p></section><section class="nb-cell nb-code" data-cell="58"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> get_act_scales<span class="tok-o">(</span>model<span class="tok-o">,</span> tokenizer<span class="tok-o">,</span> dataset_path<span class="tok-o">,</span> num_samples<span class="tok-o">=</span><span class="tok-m">512</span><span class="tok-o">,</span> seq_len<span class="tok-o">=</span><span class="tok-m">512</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     모델의 각 Linear Layer 입력 텐서의 activation scale(채널별 최대 절댓값)을 수집
     - 양자화(quantization) 시 per-channel scaling factor를 찾을 때 사용
     &quot;&quot;&quot;</span>
-
     model<span class="tok-o">.</span>eval<span class="tok-o">(</span><span class="tok-o">)</span>
-
     device <span class="tok-o">=</span> <span class="tok-b">next</span><span class="tok-o">(</span>model<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">.</span>device
-
     act_scales <span class="tok-o">=</span> <span class="tok-o">{</span><span class="tok-o">}</span>
 
-
-
     <span class="tok-c"># 텐서의 channel-wise 최대 절댓값을 누적 통계로 기록</span>
-
     <span class="tok-k">def</span> stat_tensor<span class="tok-o">(</span>name<span class="tok-o">,</span> tensor<span class="tok-o">)</span><span class="tok-o">:</span>
-
         hidden_dim <span class="tok-o">=</span> tensor<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">]</span>
-
         <span class="tok-c"># (batch × seq_len, hidden_dim) 형태로 변환</span>
-
         tensor <span class="tok-o">=</span> tensor<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> hidden_dim<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-c"># 각 hidden dimension별 최대값 추출</span>
-
         comming_max <span class="tok-o">=</span> torch<span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span>tensor<span class="tok-o">,</span> dim<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span><span class="tok-o">.</span><span class="tok-b">float</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>cpu<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># 이미 존재하는 layer면 기존 최대값과 비교하여 갱신</span>
-
         <span class="tok-k">if</span> name <span class="tok-k">in</span> act_scales<span class="tok-o">:</span>
-
             act_scales<span class="tok-o">[</span>name<span class="tok-o">]</span> <span class="tok-o">=</span> torch<span class="tok-o">.</span><span class="tok-b">max</span><span class="tok-o">(</span>act_scales<span class="tok-o">[</span>name<span class="tok-o">]</span><span class="tok-o">,</span> comming_max<span class="tok-o">)</span>
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             act_scales<span class="tok-o">[</span>name<span class="tok-o">]</span> <span class="tok-o">=</span> comming_max
 
-
-
     <span class="tok-c"># forward hook에서 입력 텐서(x)를 받아 stat_tensor()로 전달</span>
-
     <span class="tok-k">def</span> stat_input_hook<span class="tok-o">(</span>m<span class="tok-o">,</span> x<span class="tok-o">,</span> y<span class="tok-o">,</span> name<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>x<span class="tok-o">,</span> <span class="tok-b">tuple</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             x <span class="tok-o">=</span> x<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
-
         stat_tensor<span class="tok-o">(</span>name<span class="tok-o">,</span> x<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 모든 Linear layer에 hook 등록</span>
-
     hooks <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> m <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span><span class="tok-o">:</span>
-
             hooks<span class="tok-o">.</span>append<span class="tok-o">(</span>
-
                 m<span class="tok-o">.</span>register_forward_hook<span class="tok-o">(</span>partial<span class="tok-o">(</span>stat_input_hook<span class="tok-o">,</span> name<span class="tok-o">=</span>name<span class="tok-o">)</span><span class="tok-o">)</span>
-
             <span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># JSON 형식 데이터셋 로드 및 셔플</span>
-
     dataset <span class="tok-o">=</span> load_dataset<span class="tok-o">(</span><span class="tok-s">&quot;json&quot;</span><span class="tok-o">,</span> data_files<span class="tok-o">=</span>dataset_path<span class="tok-o">,</span> split<span class="tok-o">=</span><span class="tok-s">&quot;train&quot;</span><span class="tok-o">)</span>
-
     dataset <span class="tok-o">=</span> dataset<span class="tok-o">.</span>shuffle<span class="tok-o">(</span>seed<span class="tok-o">=</span><span class="tok-m">42</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 지정된 개수(num_samples)만큼 입력을 모델에 통과시키며 통계 수집</span>
-
     <span class="tok-k">for</span> i <span class="tok-k">in</span> tqdm<span class="tok-o">(</span><span class="tok-b">range</span><span class="tok-o">(</span>num_samples<span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-c"># 텍스트를 토크나이즈하고 GPU로 이동</span>
-
         input_ids <span class="tok-o">=</span> tokenizer<span class="tok-o">(</span>
-
             dataset<span class="tok-o">[</span>i<span class="tok-o">]</span><span class="tok-o">[</span><span class="tok-s">&quot;text&quot;</span><span class="tok-o">]</span><span class="tok-o">,</span> return_tensors<span class="tok-o">=</span><span class="tok-s">&quot;pt&quot;</span><span class="tok-o">,</span> max_length<span class="tok-o">=</span>seq_len<span class="tok-o">,</span> truncation<span class="tok-o">=</span><span class="tok-k">True</span>
-
         <span class="tok-o">)</span><span class="tok-o">.</span>input_ids<span class="tok-o">.</span>to<span class="tok-o">(</span>device<span class="tok-o">)</span>
-
         <span class="tok-c"># Forward 수행 (hook에 의해 activation 통계 자동 수집)</span>
-
         model<span class="tok-o">(</span>input_ids<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># hook 해제</span>
-
     <span class="tok-k">for</span> h <span class="tok-k">in</span> hooks<span class="tok-o">:</span>
-
         h<span class="tok-o">.</span>remove<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># layer 이름 → 채널별 최대 activation 값 매핑 딕셔너리 반환</span>
-
     <span class="tok-k">return</span> act_scales
-
 </code></pre></section><section class="nb-cell nb-code" data-cell="59"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> smooth_lm<span class="tok-o">(</span>model<span class="tok-o">,</span> scales<span class="tok-o">,</span> alpha<span class="tok-o">=</span><span class="tok-m">0.5</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> module <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>module<span class="tok-o">,</span> OPTDecoderLayer<span class="tok-o">)</span><span class="tok-o">:</span>
-
             attn_ln <span class="tok-o">=</span> module<span class="tok-o">.</span>self_attn_layer_norm
-
             qkv <span class="tok-o">=</span> <span class="tok-o">[</span>
-
                 module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>q_proj<span class="tok-o">,</span>
-
                 module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>k_proj<span class="tok-o">,</span>
-
                 module<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>v_proj<span class="tok-o">,</span>
-
             <span class="tok-o">]</span>
-
             qkv_input_scales <span class="tok-o">=</span> scales<span class="tok-o">[</span>name <span class="tok-o">+</span> <span class="tok-s">&quot;.self_attn.q_proj&quot;</span><span class="tok-o">]</span>
-
             smooth_ln_fcs<span class="tok-o">(</span>attn_ln<span class="tok-o">,</span> qkv<span class="tok-o">,</span> qkv_input_scales<span class="tok-o">,</span> alpha<span class="tok-o">)</span>
 
-
-
             ffn_ln <span class="tok-o">=</span> module<span class="tok-o">.</span>final_layer_norm
-
             fc1 <span class="tok-o">=</span> module<span class="tok-o">.</span>fc1
-
             fc1_input_scales <span class="tok-o">=</span> scales<span class="tok-o">[</span>name <span class="tok-o">+</span> <span class="tok-s">&quot;.fc1&quot;</span><span class="tok-o">]</span>
-
-            smooth_ln_fcs<span class="tok-o">(</span>ffn_ln<span class="tok-o">,</span> fc1<span class="tok-o">,</span> fc1_input_scales<span class="tok-o">,</span> alpha<span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-code" data-cell="60"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
-
+            smooth_ln_fcs<span class="tok-o">(</span>ffn_ln<span class="tok-o">,</span> fc1<span class="tok-o">,</span> fc1_input_scales<span class="tok-o">,</span> alpha<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="60"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
 
 act_scales <span class="tok-o">=</span> get_act_scales<span class="tok-o">(</span>
-
         llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> llm_model<span class="tok-o">.</span>tokenizer<span class="tok-o">,</span> datapath<span class="tok-o">,</span> <span class="tok-m">512</span><span class="tok-o">,</span> <span class="tok-m">512</span><span class="tok-o">)</span>
-
 smooth_lm<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> act_scales<span class="tok-o">)</span>
-
 model_sampled <span class="tok-o">=</span> quantize_opt<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">)</span>
-
 llm_model<span class="tok-o">.</span>model_change<span class="tok-o">(</span>model_sampled<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Evaluate the model</span>
-
 llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-k">del</span> llm_model
-
 torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>empty_cache<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="61"><h1>Rotation Based Quantization</h1>
 <p>최근에는 LLM Quantization의 Outlier 문제를 해결하기 위해 Rotation Matrix를 곱해서 Outlier를 제거하는 방법들이 제시되고 있습니다. (QuaRot, SpinQuant 등)</p>
 <p>&lt;p align=&quot;center&quot;&gt; <img src="https://raw.githubusercontent.com/facebookresearch/SpinQuant/refs/heads/main/SpinQuant.png" width="800"> &lt;/p&gt;</p>
@@ -2087,269 +1126,145 @@ torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>empty_cache<spa
 <ul><li>새로운 변수로 정의</li></ul>
 <h2>장점</h2>
 <ul><li>회전을 통해 분포를 분산시켜 Outlier 현상을 완화</li><li>사전에 Weight에 곱해두는 것을 통해 적용 가능 및 온라인 연산 제거 가능</li></ul></section><section class="nb-cell nb-code" data-cell="62"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">llm_model <span class="tok-o">=</span> LLMModel<span class="tok-o">(</span><span class="tok-s">&quot;TinyLlama/TinyLlama-1.1B-Chat-v1.0&quot;</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="63"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> get_orthogonal_matrix<span class="tok-o">(</span>size<span class="tok-o">,</span> mode<span class="tok-o">=</span><span class="tok-s">&quot;random&quot;</span><span class="tok-o">,</span> dtype<span class="tok-o">=</span>torch<span class="tok-o">.</span>float32<span class="tok-o">,</span> device<span class="tok-o">=</span><span class="tok-s">&quot;cpu&quot;</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     주어진 크기의 직교(orthogonal) 행렬을 생성하는 함수.
     랜덤 tensor를 QR Decomposition 한 Q tensor를 활용
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">if</span> mode <span class="tok-o">==</span> <span class="tok-s">&quot;random&quot;</span><span class="tok-o">:</span>
-
         A <span class="tok-o">=</span> torch<span class="tok-o">.</span>randn<span class="tok-o">(</span>size<span class="tok-o">,</span> size<span class="tok-o">,</span> dtype<span class="tok-o">=</span>torch<span class="tok-o">.</span>float32<span class="tok-o">,</span> device<span class="tok-o">=</span>device<span class="tok-o">)</span>
-
         Q<span class="tok-o">,</span> R <span class="tok-o">=</span> torch<span class="tok-o">.</span>linalg<span class="tok-o">.</span>qr<span class="tok-o">(</span>A<span class="tok-o">)</span>
-
         Q <span class="tok-o">*=</span> torch<span class="tok-o">.</span>sign<span class="tok-o">(</span>torch<span class="tok-o">.</span>diag<span class="tok-o">(</span>R<span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">.</span>unsqueeze<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
         <span class="tok-k">return</span> Q<span class="tok-o">.</span>to<span class="tok-o">(</span>dtype<span class="tok-o">)</span>
-
     <span class="tok-k">else</span><span class="tok-o">:</span>
-
         <span class="tok-k">raise</span> ValueError<span class="tok-o">(</span>f&quot;Unknown mode: <span class="tok-o">{</span>mode<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
 
-
-
 dummy_vector <span class="tok-o">=</span> torch<span class="tok-o">.</span>randn<span class="tok-o">(</span><span class="tok-m">100</span><span class="tok-o">)</span>
-
 dummy_vector<span class="tok-o">[</span><span class="tok-m">50</span><span class="tok-o">]</span> <span class="tok-o">=</span> <span class="tok-m">30</span>
 
-
-
 rotation_matrix <span class="tok-o">=</span> get_orthogonal_matrix<span class="tok-o">(</span><span class="tok-m">100</span><span class="tok-o">)</span>
-
 rotated_vector <span class="tok-o">=</span> rotation_matrix <span class="tok-o">@</span> dummy_vector
 
-
-
 <span class="tok-k">def</span> plot_vector<span class="tok-o">(</span>vec<span class="tok-o">,</span> title<span class="tok-o">)</span><span class="tok-o">:</span>
-
     plt<span class="tok-o">.</span>figure<span class="tok-o">(</span>figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">5</span><span class="tok-o">,</span> <span class="tok-m">2</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>vec<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>numpy<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> linewidth<span class="tok-o">=</span><span class="tok-m">2</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>title<span class="tok-o">(</span>title<span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">14</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>xlabel<span class="tok-o">(</span><span class="tok-s">&#x27;Index&#x27;</span><span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">12</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;Absolute Value&#x27;</span><span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">12</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>grid<span class="tok-o">(</span><span class="tok-k">True</span><span class="tok-o">,</span> linestyle<span class="tok-o">=</span><span class="tok-s">&#x27;--&#x27;</span><span class="tok-o">,</span> alpha<span class="tok-o">=</span><span class="tok-m">0.6</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>tight_layout<span class="tok-o">(</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-b">print</span><span class="tok-o">(</span>rotation_matrix<span class="tok-o">)</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span>torch<span class="tok-o">.</span><span class="tok-b">round</span><span class="tok-o">(</span>rotation_matrix <span class="tok-o">@</span> rotation_matrix<span class="tok-o">.</span>T<span class="tok-o">)</span><span class="tok-o">)</span>
-
 plot_vector<span class="tok-o">(</span>dummy_vector<span class="tok-o">,</span> <span class="tok-s">&#x27;Original Vector (Absolute Values)&#x27;</span><span class="tok-o">)</span>
-
 plot_vector<span class="tok-o">(</span>rotated_vector<span class="tok-o">,</span> <span class="tok-s">&#x27;Rotated Vector (Absolute Values)&#x27;</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="64"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> quantize_tinyllama<span class="tok-o">(</span>
-
     model<span class="tok-o">,</span> weight_quant<span class="tok-o">=</span><span class="tok-s">&quot;per_tensor&quot;</span><span class="tok-o">,</span> act_quant<span class="tok-o">=</span><span class="tok-s">&quot;per_tensor&quot;</span><span class="tok-o">,</span> quantize_bmm_input<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">,</span> quantize_bits<span class="tok-o">=</span><span class="tok-m">4</span>
-
 <span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     TinyLlama 모델의 모든 Linear layer를 양자화 버전으로 변환.
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> m <span class="tok-k">in</span> tqdm<span class="tok-o">(</span>model<span class="tok-o">.</span>model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> torch<span class="tok-o">.</span>nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-c"># lm_head (최종 출력층)는 따로 처리되므로 건너뜀</span>
-
             <span class="tok-k">if</span> <span class="tok-s">&quot;lm_head&quot;</span> <span class="tok-k">in</span> name<span class="tok-o">:</span>
-
                 <span class="tok-k">continue</span>
 
-
-
             <span class="tok-c"># 기존 Linear layer → 양자화 버전(W8A8Linear)으로 변환</span>
-
             quantized_layer <span class="tok-o">=</span> W8A8Linear<span class="tok-o">.</span>from_float<span class="tok-o">(</span>
-
                 m<span class="tok-o">,</span>
-
                 weight_quant<span class="tok-o">=</span>weight_quant<span class="tok-o">,</span>
-
                 act_quant<span class="tok-o">=</span>act_quant<span class="tok-o">,</span>
-
                 quantize_bits<span class="tok-o">=</span><span class="tok-m">4</span>  <span class="tok-c"># 기본 4-bit weight quantization</span>
-
             <span class="tok-o">)</span>
 
-
-
             <span class="tok-c"># 기존 모델 구조 내에서 해당 layer를 교체하기 위한 부모 모듈 탐색</span>
-
             parent_name <span class="tok-o">=</span> <span class="tok-s">&quot;.&quot;</span><span class="tok-o">.</span>join<span class="tok-o">(</span>name<span class="tok-o">.</span>split<span class="tok-o">(</span><span class="tok-s">&quot;.&quot;</span><span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">]</span><span class="tok-o">)</span>  <span class="tok-c"># 예: &#x27;transformer.layers.0.mlp&#x27;</span>
-
             child_name <span class="tok-o">=</span> name<span class="tok-o">.</span>split<span class="tok-o">(</span><span class="tok-s">&quot;.&quot;</span><span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">]</span>               <span class="tok-c"># 예: &#x27;fc1&#x27;</span>
 
-
-
             <span class="tok-k">if</span> parent_name<span class="tok-o">:</span>
-
                 <span class="tok-c"># 부모 모듈 접근 후, 해당 자식 모듈을 quantized layer로 대체</span>
-
                 parent <span class="tok-o">=</span> model<span class="tok-o">.</span>model<span class="tok-o">.</span>get_submodule<span class="tok-o">(</span>parent_name<span class="tok-o">)</span>
-
                 setattr<span class="tok-o">(</span>parent<span class="tok-o">,</span> child_name<span class="tok-o">,</span> quantized_layer<span class="tok-o">)</span>
-
             <span class="tok-k">else</span><span class="tok-o">:</span>
-
                 <span class="tok-c"># 루트 수준에 있는 Linear layer라면 직접 교체</span>
-
                 setattr<span class="tok-o">(</span>model<span class="tok-o">.</span>model<span class="tok-o">,</span> child_name<span class="tok-o">,</span> quantized_layer<span class="tok-o">)</span>
 
-
-
-    <span class="tok-k">return</span> model
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="65"><h2>Layernorm ↔ Linear Fusion</h2>
+    <span class="tok-k">return</span> model</code></pre></section><section class="nb-cell nb-markdown" data-cell="65"><h2>Layernorm ↔ Linear Fusion</h2>
 <p>실제 모델에서는 Rotation Matrix 사이에 Layernorm이 존재하는 경우가 많습니다.</p>
 <p>&lt;p align=&quot;center&quot;&gt; <img src="https://miro.medium.com/v2/resize:fit:1252/1*kC-cWBWDEZpkSCtYIUsj4w.png" width="300"> &lt;/p&gt;</p>
 <p>Normalization Layer의 영향으로 Rotation Matrix가 곱해지지 못해 정상적으로 제거되지 못하고 모델의 연산이 부정확해지는 문제가 발생할 수 있습니다.</p>
 <p>따라서, Rotation 적용 이전에 Normalization Layer를 Linear Layer와 Fusion해야 합니다.</p></section><section class="nb-cell nb-code" data-cell="66"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># Layer Norm Fusion Functions for TinyLlama</span>
-
 <span class="tok-k">def</span> fuse_ln_linear<span class="tok-o">(</span>layernorm<span class="tok-o">,</span> linear_layers<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     LayerNorm(LN) 연산을 인접한 Linear Layer로 융합(Fusion)하는 함수.
     - LayerNorm의 weight, bias를 Linear layer의 weight, bias로 병합하여 Rotate가 가능한 형태로 변경
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">for</span> linear <span class="tok-k">in</span> linear_layers<span class="tok-o">:</span>
-
         linear_dtype <span class="tok-o">=</span> linear<span class="tok-o">.</span>weight<span class="tok-o">.</span>dtype
 
-
-
         <span class="tok-c"># (1) 새로운 Linear weight 계산</span>
-
         <span class="tok-c"># W&#x27; = W * γ  (γ는 LayerNorm의 weight)</span>
-
         W_ <span class="tok-o">=</span> linear<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">.</span>double<span class="tok-o">(</span><span class="tok-o">)</span>
-
         linear<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> <span class="tok-o">(</span>W_ <span class="tok-o">*</span> layernorm<span class="tok-o">.</span>weight<span class="tok-o">.</span>double<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">.</span>to<span class="tok-o">(</span>linear_dtype<span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># (2) 새로운 bias 계산</span>
-
         <span class="tok-c"># b&#x27; = b + W * β  (β는 LayerNorm의 bias)</span>
-
         <span class="tok-k">if</span> <span class="tok-b">hasattr</span><span class="tok-o">(</span>layernorm<span class="tok-o">,</span> <span class="tok-s">&quot;bias&quot;</span><span class="tok-o">)</span> <span class="tok-k">and</span> layernorm<span class="tok-o">.</span>bias <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
             <span class="tok-k">if</span> linear<span class="tok-o">.</span>bias <span class="tok-k">is</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
                 <span class="tok-c"># bias가 없을 경우 0으로 초기화</span>
-
                 linear<span class="tok-o">.</span>bias <span class="tok-o">=</span> torch<span class="tok-o">.</span>nn<span class="tok-o">.</span>Parameter<span class="tok-o">(</span>
-
                     torch<span class="tok-o">.</span>zeros<span class="tok-o">(</span>linear<span class="tok-o">.</span>out_features<span class="tok-o">,</span> dtype<span class="tok-o">=</span>torch<span class="tok-o">.</span>float64<span class="tok-o">)</span>
-
                 <span class="tok-o">)</span>
-
             linear<span class="tok-o">.</span>bias<span class="tok-o">.</span>data <span class="tok-o">=</span> linear<span class="tok-o">.</span>bias<span class="tok-o">.</span>data<span class="tok-o">.</span>double<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">+</span> torch<span class="tok-o">.</span>matmul<span class="tok-o">(</span>
-
                 W_<span class="tok-o">,</span> layernorm<span class="tok-o">.</span>bias<span class="tok-o">.</span>double<span class="tok-o">(</span><span class="tok-o">)</span>
-
             <span class="tok-o">)</span>
-
             linear<span class="tok-o">.</span>bias<span class="tok-o">.</span>data <span class="tok-o">=</span> linear<span class="tok-o">.</span>bias<span class="tok-o">.</span>data<span class="tok-o">.</span>to<span class="tok-o">(</span>linear_dtype<span class="tok-o">)</span>
 
 
-
-
-
 <span class="tok-k">def</span> fuse_layer_norms_tinyllama<span class="tok-o">(</span>model<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     TinyLlama 모델 구조에 맞게 LayerNorm을 인접 Linear Layer에 융합(Fuse)하는 함수.
     - Embedding, Attention, Feed-Forward, Final Norm 등 전체 구조에 적용.
     &quot;&quot;&quot;</span>
-
     <span class="tok-c"># (1) 임베딩 레이어 정규화</span>
-
     <span class="tok-c"># 임베딩의 평균을 제거하여 중심화</span>
-
     <span class="tok-k">for</span> W <span class="tok-k">in</span> <span class="tok-o">[</span>model<span class="tok-o">.</span>model<span class="tok-o">.</span>embed_tokens<span class="tok-o">]</span><span class="tok-o">:</span>
-
         W_ <span class="tok-o">=</span> W<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">.</span>double<span class="tok-o">(</span><span class="tok-o">)</span>
-
         W<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> <span class="tok-o">(</span>W_ <span class="tok-o">-</span> W_<span class="tok-o">.</span>mean<span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">.</span>to<span class="tok-o">(</span>W<span class="tok-o">.</span>weight<span class="tok-o">.</span>data<span class="tok-o">.</span>dtype<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># (2) Transformer Block 단위로 LayerNorm Fusion 수행</span>
-
     layers <span class="tok-o">=</span> <span class="tok-o">[</span>layer <span class="tok-k">for</span> layer <span class="tok-k">in</span> model<span class="tok-o">.</span>model<span class="tok-o">.</span>layers<span class="tok-o">]</span>
 
-
-
     <span class="tok-k">for</span> layer <span class="tok-k">in</span> layers<span class="tok-o">:</span>
-
         <span class="tok-c"># (2-1) Attention 입력 LayerNorm을 q, k, v projection으로 융합</span>
-
         fuse_ln_linear<span class="tok-o">(</span>
-
             layer<span class="tok-o">.</span>input_layernorm<span class="tok-o">,</span>
-
             <span class="tok-o">[</span>layer<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>q_proj<span class="tok-o">,</span> layer<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>k_proj<span class="tok-o">,</span> layer<span class="tok-o">.</span>self_attn<span class="tok-o">.</span>v_proj<span class="tok-o">]</span>
-
         <span class="tok-o">)</span>
-
-
 
         <span class="tok-c"># (2-2) Attention 출력 후의 LayerNorm을 MLP의 게이트 및 업 projection으로 융합</span>
-
         fuse_ln_linear<span class="tok-o">(</span>
-
             layer<span class="tok-o">.</span>post_attention_layernorm<span class="tok-o">,</span>
-
             <span class="tok-o">[</span>layer<span class="tok-o">.</span>mlp<span class="tok-o">.</span>gate_proj<span class="tok-o">,</span> layer<span class="tok-o">.</span>mlp<span class="tok-o">.</span>up_proj<span class="tok-o">]</span>
-
         <span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># (2-3) 융합 후, LayerNorm weight를 1로 초기화 (효과적으로 무시됨)</span>
-
         W_norm <span class="tok-o">=</span> layer<span class="tok-o">.</span>input_layernorm<span class="tok-o">.</span>weight<span class="tok-o">.</span>data
-
         layer<span class="tok-o">.</span>input_layernorm<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> torch<span class="tok-o">.</span>ones_like<span class="tok-o">(</span>W_norm<span class="tok-o">)</span>
 
-
-
         W_norm <span class="tok-o">=</span> layer<span class="tok-o">.</span>post_attention_layernorm<span class="tok-o">.</span>weight<span class="tok-o">.</span>data
-
         layer<span class="tok-o">.</span>post_attention_layernorm<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> torch<span class="tok-o">.</span>ones_like<span class="tok-o">(</span>W_norm<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># (3) 마지막 LayerNorm을 LM Head로 융합</span>
-
     fuse_ln_linear<span class="tok-o">(</span>
-
         model<span class="tok-o">.</span>model<span class="tok-o">.</span>norm<span class="tok-o">,</span>
-
         <span class="tok-o">[</span>model<span class="tok-o">.</span>lm_head<span class="tok-o">]</span><span class="tok-o">,</span>
-
     <span class="tok-o">)</span>
-
     W_norm <span class="tok-o">=</span> model<span class="tok-o">.</span>model<span class="tok-o">.</span>norm<span class="tok-o">.</span>weight<span class="tok-o">.</span>data
-
-    model<span class="tok-o">.</span>model<span class="tok-o">.</span>norm<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> torch<span class="tok-o">.</span>ones_like<span class="tok-o">(</span>W_norm<span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="67"><h2>[실습 5] Rotate Matrix 적용</h2>
+    model<span class="tok-o">.</span>model<span class="tok-o">.</span>norm<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> torch<span class="tok-o">.</span>ones_like<span class="tok-o">(</span>W_norm<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="67"><h2>[실습 5] Rotate Matrix 적용</h2>
 <p>R1, R2, R3, R4 등 다양한 Rotation Matrix가 Quantization 정확도를 높이기 위해 사용됩니다.</p>
 <p>그러나, R2는 R1과 유사하게 적용 가능하고, R3와 R4는 Online에서 구해지는 Matrix이기 때문에 구현 난이도를 낮추기 위해 R1만 사용하는 것으로 하겠습니다.</p>
 <p>QuaRot 혹은 SpinQuant 그림을 참고하셔서 각각의 연산에 R1이 어떻게 적용될 것인지 구현해보시기 바랍니다.</p></section><section class="nb-cell nb-code" data-cell="68"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> rotate_model_weight<span class="tok-o">(</span>model<span class="tok-o">,</span> R1<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     모델의 모든 Embedding 및 Linear Layer 파라미터에 회전 행렬(R1)을 적용하여
     Weight Space Rotation을 수행하는 함수.
@@ -2357,222 +1272,113 @@ plot_vector<span class="tok-o">(</span>rotated_vector<span class="tok-o">,</span
     - QuaRot, SpinQuant 등의 기법에서 사용되는 핵심 단계로, 모델의 weight를 직교 행렬로 회전시켜 Outlier 완화
     - 회전 행렬 R1은 (hidden_dim × hidden_dim) 형태의 직교 행렬이어야 함.
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">for</span> n<span class="tok-o">,</span> m <span class="tok-k">in</span> model<span class="tok-o">.</span>named_modules<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-c">############### YOUR CODE STARTS HERE ###############</span>
-
         <span class="tok-c"># Pytorch에서 &#x27;@&#x27; 연산자는 행렬 곱 (dot product)을 의미합니다.</span>
-
         <span class="tok-c"># nn.Linear의 weight 파라미터는 W^T 형태로 저장되어 있다는 점을 유의해야 합니다.</span>
-
         <span class="tok-c">#</span>
-
         <span class="tok-c"># Shape 요약:</span>
-
         <span class="tok-c">#   Embedding  : (num_tokens, hidden_dim)</span>
-
         <span class="tok-c">#   Linear     : (out_channels, in_channels)</span>
-
         <span class="tok-c">#   Rotation R : (hidden_dim, hidden_dim)</span>
 
-
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> nn<span class="tok-o">.</span>Embedding<span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-c"># Embedding Weight: (num_tokens, hidden_dim)</span>
-
             W_ <span class="tok-o">=</span> m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data
-
             m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span>
 
-
-
         <span class="tok-k">if</span> <span class="tok-b">isinstance</span><span class="tok-o">(</span>m<span class="tok-o">,</span> nn<span class="tok-o">.</span>Linear<span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-c"># Linear Layer: (out_features, in_features)</span>
-
             <span class="tok-k">if</span> <span class="tok-s">&quot;o_proj&quot;</span> <span class="tok-k">in</span> n <span class="tok-k">or</span> <span class="tok-s">&quot;down_proj&quot;</span> <span class="tok-k">in</span> n<span class="tok-o">:</span>
-
                 <span class="tok-c"># Attention 출력 또는 FFN 다운프로젝션</span>
-
                 W_ <span class="tok-o">=</span> m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data
-
                 m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span>
-
             <span class="tok-k">else</span><span class="tok-o">:</span>
-
                 <span class="tok-c"># Q, K, V 프로젝션 및 FFN 게이트/업프로젝션</span>
-
                 W_ <span class="tok-o">=</span> m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data
-
                 m<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span>
-
-
 
         <span class="tok-c">############### YOUR CODE ENDS HERE #################</span>
 
-
-
         <span class="tok-c"># GPU 메모리 캐시 정리</span>
-
-        torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>empty_cache<span class="tok-o">(</span><span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-code" data-cell="69"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;\nOriginal 모델 성능 측정 중...&quot;</span><span class="tok-o">)</span>
-
+        torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>empty_cache<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="69"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;\nOriginal 모델 성능 측정 중...&quot;</span><span class="tok-o">)</span>
 llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
 original_perplexity <span class="tok-o">=</span> llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span><span class="tok-m">16</span><span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span>
-
 output_orig <span class="tok-o">=</span> llm_model<span class="tok-o">.</span>model<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>testenc<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span><span class="tok-o">:</span><span class="tok-m">500</span><span class="tok-o">]</span><span class="tok-o">.</span>to<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">.</span>device<span class="tok-o">)</span><span class="tok-o">,</span> output_hidden_states<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
 torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>empty_cache<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="70"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">Q_BITS <span class="tok-o">=</span> <span class="tok-m">8</span>
 
-
-
 <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;\nQuantization만 적용한 모델 성능 측정 중...&quot;</span><span class="tok-o">)</span>
-
 llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
 model <span class="tok-o">=</span> quantize_tinyllama<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> quantize_bits<span class="tok-o">=</span>Q_BITS<span class="tok-o">)</span>
-
 llm_model<span class="tok-o">.</span>model_change<span class="tok-o">(</span>model<span class="tok-o">)</span>
-
 quantized_only_perplexity <span class="tok-o">=</span> llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span>Q_BITS<span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span>
-
 torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>empty_cache<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="71"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;\nRotation + Quantization 적용한 모델 성능 측정 중...&quot;</span><span class="tok-o">)</span>
-
 llm_model<span class="tok-o">.</span>model_reset<span class="tok-o">(</span><span class="tok-o">)</span>
-
 fuse_layer_norms_tinyllama<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">)</span>
-
 hidden_size <span class="tok-o">=</span> llm_model<span class="tok-o">.</span>model<span class="tok-o">.</span>config<span class="tok-o">.</span>hidden_size
-
 R1_random <span class="tok-o">=</span> get_orthogonal_matrix<span class="tok-o">(</span>hidden_size<span class="tok-o">,</span> mode<span class="tok-o">=</span><span class="tok-s">&quot;random&quot;</span><span class="tok-o">,</span> dtype<span class="tok-o">=</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">.</span>dtype<span class="tok-o">,</span> device<span class="tok-o">=</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">.</span>device<span class="tok-o">)</span>
-
 rotate_model_weight<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> R1_random<span class="tok-o">)</span>
-
 model <span class="tok-o">=</span> quantize_tinyllama<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">,</span> quantize_bits<span class="tok-o">=</span>Q_BITS<span class="tok-o">)</span>
-
 llm_model<span class="tok-o">.</span>model_change<span class="tok-o">(</span>model<span class="tok-o">)</span>
-
 rotation_quantized_perplexity <span class="tok-o">=</span> llm_model<span class="tok-o">.</span>model_evaluate<span class="tok-o">(</span>data_width<span class="tok-o">=</span>Q_BITS<span class="tok-o">,</span> group_size<span class="tok-o">=</span><span class="tok-m">128</span><span class="tok-o">)</span>
-
 output_rotated <span class="tok-o">=</span> llm_model<span class="tok-o">.</span>model<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>testenc<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">,</span><span class="tok-o">:</span><span class="tok-m">500</span><span class="tok-o">]</span><span class="tok-o">.</span>to<span class="tok-o">(</span>llm_model<span class="tok-o">.</span>model<span class="tok-o">.</span>device<span class="tok-o">)</span><span class="tok-o">,</span> output_hidden_states<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
 torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>empty_cache<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="72"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> plot_2d_layer_comparison<span class="tok-o">(</span>output1<span class="tok-o">,</span> output2<span class="tok-o">,</span> title1<span class="tok-o">=</span><span class="tok-s">&quot;Original&quot;</span><span class="tok-o">,</span> title2<span class="tok-o">=</span><span class="tok-s">&quot;Rotated&quot;</span><span class="tok-o">,</span> layer_range<span class="tok-o">=</span><span class="tok-k">None</span><span class="tok-o">,</span> seq_slice<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">100</span><span class="tok-o">,</span> <span class="tok-k">None</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     hs1<span class="tok-o">,</span> hs2 <span class="tok-o">=</span> output1<span class="tok-o">.</span>hidden_states<span class="tok-o">,</span> output2<span class="tok-o">.</span>hidden_states
-
     n_layers <span class="tok-o">=</span> <span class="tok-b">min</span><span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>hs1<span class="tok-o">)</span><span class="tok-o">,</span> <span class="tok-b">len</span><span class="tok-o">(</span>hs2<span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-k">if</span> layer_range <span class="tok-k">is</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
         layer_range <span class="tok-o">=</span> <span class="tok-b">range</span><span class="tok-o">(</span>n_layers<span class="tok-o">)</span>
-
     <span class="tok-k">else</span><span class="tok-o">:</span>
-
         layer_range <span class="tok-o">=</span> <span class="tok-o">[</span>i <span class="tok-k">for</span> i <span class="tok-k">in</span> layer_range <span class="tok-k">if</span> i <span class="tok-o">&lt;</span> n_layers<span class="tok-o">]</span>
 
-
-
     n_rows <span class="tok-o">=</span> <span class="tok-b">len</span><span class="tok-o">(</span>layer_range<span class="tok-o">)</span>
-
     n_cols <span class="tok-o">=</span> <span class="tok-m">2</span>
 
-
-
     plt<span class="tok-o">.</span>figure<span class="tok-o">(</span>figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">10</span><span class="tok-o">,</span> <span class="tok-m">2.5</span> <span class="tok-o">*</span> n_rows<span class="tok-o">)</span><span class="tok-o">,</span> dpi<span class="tok-o">=</span><span class="tok-m">140</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>suptitle<span class="tok-o">(</span><span class="tok-s">&quot;Hidden State Mean Activations Comparison&quot;</span><span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">15</span><span class="tok-o">,</span> y<span class="tok-o">=</span><span class="tok-m">1.01</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-k">for</span> i<span class="tok-o">,</span> layer_idx <span class="tok-k">in</span> <span class="tok-b">enumerate</span><span class="tok-o">(</span>layer_range<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-c"># 첫 번째 모델 데이터</span>
-
         data1 <span class="tok-o">=</span> hs1<span class="tok-o">[</span>layer_idx<span class="tok-o">]</span><span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>cpu<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>numpy<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">if</span> <span class="tok-b">len</span><span class="tok-o">(</span>data1<span class="tok-o">.</span>shape<span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">3</span><span class="tok-o">:</span>
-
             data1 <span class="tok-o">=</span> data1<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
-
         start<span class="tok-o">,</span> end <span class="tok-o">=</span> seq_slice
-
         data1 <span class="tok-o">=</span> data1<span class="tok-o">[</span>start<span class="tok-o">:</span>end<span class="tok-o">,</span> <span class="tok-o">:</span><span class="tok-o">]</span>
-
         mean_act1 <span class="tok-o">=</span> np<span class="tok-o">.</span>mean<span class="tok-o">(</span>np<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span>data1<span class="tok-o">)</span><span class="tok-o">,</span> axis<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># 두 번째 모델 데이터</span>
-
         data2 <span class="tok-o">=</span> hs2<span class="tok-o">[</span>layer_idx<span class="tok-o">]</span><span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>cpu<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>numpy<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">if</span> <span class="tok-b">len</span><span class="tok-o">(</span>data2<span class="tok-o">.</span>shape<span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">3</span><span class="tok-o">:</span>
-
             data2 <span class="tok-o">=</span> data2<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
-
         data2 <span class="tok-o">=</span> data2<span class="tok-o">[</span>start<span class="tok-o">:</span>end<span class="tok-o">,</span> <span class="tok-o">:</span><span class="tok-o">]</span>
-
         mean_act2 <span class="tok-o">=</span> np<span class="tok-o">.</span>mean<span class="tok-o">(</span>np<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span>data2<span class="tok-o">)</span><span class="tok-o">,</span> axis<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span>
 
-
-
         <span class="tok-c"># 왼쪽: Original</span>
-
         plt<span class="tok-o">.</span>subplot<span class="tok-o">(</span>n_rows<span class="tok-o">,</span> n_cols<span class="tok-o">,</span> <span class="tok-m">2</span> <span class="tok-o">*</span> i <span class="tok-o">+</span> <span class="tok-m">1</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>np<span class="tok-o">.</span>arange<span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>mean_act1<span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">,</span> mean_act1<span class="tok-o">,</span> color<span class="tok-o">=</span><span class="tok-s">&quot;blue&quot;</span><span class="tok-o">,</span> linewidth<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>title<span class="tok-o">(</span>f&quot;<span class="tok-o">{</span>title1<span class="tok-o">}</span> - Layer <span class="tok-o">{</span>layer_idx<span class="tok-o">}</span>&quot;<span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">10</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>xlabel<span class="tok-o">(</span><span class="tok-s">&quot;Hidden Dim&quot;</span><span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&quot;|Activation|&quot;</span><span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>grid<span class="tok-o">(</span><span class="tok-k">True</span><span class="tok-o">,</span> linestyle<span class="tok-o">=</span><span class="tok-s">&quot;--&quot;</span><span class="tok-o">,</span> alpha<span class="tok-o">=</span><span class="tok-m">0.4</span><span class="tok-o">)</span>
-
-
 
         <span class="tok-c"># 오른쪽: Rotated</span>
-
         plt<span class="tok-o">.</span>subplot<span class="tok-o">(</span>n_rows<span class="tok-o">,</span> n_cols<span class="tok-o">,</span> <span class="tok-m">2</span> <span class="tok-o">*</span> i <span class="tok-o">+</span> <span class="tok-m">2</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>np<span class="tok-o">.</span>arange<span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>mean_act2<span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">,</span> mean_act2<span class="tok-o">,</span> color<span class="tok-o">=</span><span class="tok-s">&quot;orange&quot;</span><span class="tok-o">,</span> linewidth<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>title<span class="tok-o">(</span>f&quot;<span class="tok-o">{</span>title2<span class="tok-o">}</span> - Layer <span class="tok-o">{</span>layer_idx<span class="tok-o">}</span>&quot;<span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">10</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>xlabel<span class="tok-o">(</span><span class="tok-s">&quot;Hidden Dim&quot;</span><span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&quot;|Activation|&quot;</span><span class="tok-o">,</span> fontsize<span class="tok-o">=</span><span class="tok-m">8</span><span class="tok-o">)</span>
-
         plt<span class="tok-o">.</span>grid<span class="tok-o">(</span><span class="tok-k">True</span><span class="tok-o">,</span> linestyle<span class="tok-o">=</span><span class="tok-s">&quot;--&quot;</span><span class="tok-o">,</span> alpha<span class="tok-o">=</span><span class="tok-m">0.4</span><span class="tok-o">)</span>
 
-
-
     plt<span class="tok-o">.</span>tight_layout<span class="tok-o">(</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
 plot_2d_layer_comparison<span class="tok-o">(</span>
-
     output_orig<span class="tok-o">,</span>
-
     output_rotated<span class="tok-o">,</span>
-
     title1<span class="tok-o">=</span><span class="tok-s">&quot;Original&quot;</span><span class="tok-o">,</span>
-
     title2<span class="tok-o">=</span><span class="tok-s">&quot;Rotated&quot;</span><span class="tok-o">,</span>
-
     layer_range<span class="tok-o">=</span><span class="tok-b">range</span><span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">,</span> <span class="tok-m">24</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
     seq_slice<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">100</span><span class="tok-o">,</span> <span class="tok-k">None</span><span class="tok-o">)</span>
-
 <span class="tok-o">)</span></code></pre></section>
   </main>
 </body>

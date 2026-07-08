@@ -36,244 +36,128 @@
 <h2>Contents</h2>
 <ul><li><strong>Pruning Granularity:</strong></li><li>Fine-grained, Vector-level, Kernel-level, Channel-level의 차이를 학습하고 구현합니다.</li><li><strong>Pruning Ratio:</strong></li><li>제거할 가중치의 비율(Sparsity)을 결정하는 방법을 배웁니다. Layer-wise와 Global 방식의 차이를 실습을 통해 확인합니다.</li><li><strong>Pruning Schedule:</strong></li><li>One-shot Pruning 및 Iterative Pruning을 이해하고, Linear 및 Cubic Scheduling 방법을 적용하여 성능 변화를 분석합니다.</li></ul></section><section class="nb-cell nb-markdown" data-cell="3"><h1>Setup</h1></section><section class="nb-cell nb-markdown" data-cell="4"><p>다음 단계에 따라 실습 환경을 준비합니다.</p>
 <ul><li><strong>필수 모듈 가져오기</strong>: 실습을 위한 필요한 라이브러리들을 import 합니다.</li><li><strong>Seed 설정</strong>: 결과 재현성을 위해 난수 생성 Seed를 설정합니다.</li><li><strong>CIFAR-10 데이터셋 준비</strong>: CIFAR-10 데이터셋을 다운로드하고 DataLoader를 생성합니다.</li><li><strong>사전 학습된 모델 로딩</strong>: 미리 학습된 CNN 모델(VGG 기반)을 로드합니다.</li></ul></section><section class="nb-cell nb-code" data-cell="5"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">import</span> math
-
 <span class="tok-k">import</span> random
-
 <span class="tok-k">from</span> typing <span class="tok-k">import</span> List
 
-
-
 <span class="tok-k">import</span> numpy <span class="tok-k">as</span> np
-
 <span class="tok-k">import</span> torch
-
 <span class="tok-k">from</span> datasets <span class="tok-k">import</span> load_dataset
-
 <span class="tok-k">from</span> matplotlib <span class="tok-k">import</span> pyplot <span class="tok-k">as</span> plt
-
 <span class="tok-k">from</span> torch <span class="tok-k">import</span> nn
-
 <span class="tok-k">from</span> torch<span class="tok-o">.</span>optim <span class="tok-k">import</span> Optimizer
-
 <span class="tok-k">from</span> torch<span class="tok-o">.</span>optim<span class="tok-o">.</span>lr_scheduler <span class="tok-k">import</span> LambdaLR
-
 <span class="tok-k">from</span> torch<span class="tok-o">.</span>utils<span class="tok-o">.</span>data <span class="tok-k">import</span> DataLoader<span class="tok-o">,</span> Dataset
-
 <span class="tok-k">from</span> torchvision<span class="tok-o">.</span>transforms <span class="tok-k">import</span> Compose<span class="tok-o">,</span> RandomCrop<span class="tok-o">,</span> RandomHorizontalFlip<span class="tok-o">,</span> ToTensor
-
 <span class="tok-k">from</span> tqdm<span class="tok-o">.</span>auto <span class="tok-k">import</span> tqdm</code></pre></section><section class="nb-cell nb-code" data-cell="6"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># Seed 설정</span>
-
 random<span class="tok-o">.</span>seed<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
 np<span class="tok-o">.</span>random<span class="tok-o">.</span>seed<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
 torch<span class="tok-o">.</span>manual_seed<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="7"><h2>CIFAR-10 데이터셋 준비</h2>
 <p>CIFAR-10 데이터셋을 다운로드하고 DataLoader를 설정합니다. CIFAR-10은 32x32 크기의 RGB 이미지로 구성된 데이터셋으로, 비행기, 자동차, 새 등 10개의 클래스에 대해 각각 6,000개씩 총 60,000개의 이미지를 포함하고 있습니다. 이 중 50,000개는 학습용(train), 10,000개는 테스트용(test)으로 분리되어 있습니다. 데이터 증강(Data Augmentation)을 위해 학습 데이터에는 RandomCrop과 RandomHorizontalFlip을 적용하고, DataLoader를 통해 배치 단위로 효율적인 학습이 가능하도록 구성합니다.</p></section><section class="nb-cell nb-code" data-cell="8"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">image_size <span class="tok-o">=</span> <span class="tok-m">32</span>
-
 transforms <span class="tok-o">=</span> <span class="tok-o">{</span>
-
     <span class="tok-s">&quot;train&quot;</span><span class="tok-o">:</span> Compose<span class="tok-o">(</span><span class="tok-o">[</span>
-
         RandomCrop<span class="tok-o">(</span>image_size<span class="tok-o">,</span> padding<span class="tok-o">=</span><span class="tok-m">4</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
         RandomHorizontalFlip<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
         ToTensor<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
     <span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
     <span class="tok-s">&quot;test&quot;</span><span class="tok-o">:</span> Compose<span class="tok-o">(</span><span class="tok-o">[</span>
-
         ToTensor<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
     <span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
 <span class="tok-o">}</span>
 
-
-
 <span class="tok-c"># torchvision의 공식 다운로드 서버 에러를 피하기 위해</span>
-
 <span class="tok-c"># Hugging Face Hub에서 CIFAR-10을 로드하는 커스텀 Dataset 클래스</span>
-
 <span class="tok-k">class</span> HFCIFAR10<span class="tok-o">(</span>Dataset<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-k">def</span> __init__<span class="tok-o">(</span>self<span class="tok-o">,</span> split<span class="tok-o">,</span> transform<span class="tok-o">=</span><span class="tok-k">None</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         self<span class="tok-o">.</span>data <span class="tok-o">=</span> load_dataset<span class="tok-o">(</span><span class="tok-s">&quot;uoft-cs/cifar10&quot;</span><span class="tok-o">,</span> split<span class="tok-o">=</span>split<span class="tok-o">)</span>
-
         self<span class="tok-o">.</span>transform <span class="tok-o">=</span> transform
-
         self<span class="tok-o">.</span>targets <span class="tok-o">=</span> <span class="tok-b">list</span><span class="tok-o">(</span>self<span class="tok-o">.</span>data<span class="tok-o">[</span><span class="tok-s">&quot;label&quot;</span><span class="tok-o">]</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-k">def</span> __len__<span class="tok-o">(</span>self<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">return</span> <span class="tok-b">len</span><span class="tok-o">(</span>self<span class="tok-o">.</span>data<span class="tok-o">)</span>
 
-
-
     <span class="tok-k">def</span> __getitem__<span class="tok-o">(</span>self<span class="tok-o">,</span> idx<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-c"># Subset에서 numpy.int64가 들어올 수 있으므로 Python int로 변환</span>
-
         idx <span class="tok-o">=</span> <span class="tok-b">int</span><span class="tok-o">(</span>idx<span class="tok-o">)</span>
-
         item <span class="tok-o">=</span> self<span class="tok-o">.</span>data<span class="tok-o">[</span>idx<span class="tok-o">]</span>
-
         <span class="tok-c"># Hugging Face CIFAR-10 field names: img, label</span>
-
         image <span class="tok-o">=</span> item<span class="tok-o">[</span><span class="tok-s">&quot;img&quot;</span><span class="tok-o">]</span><span class="tok-o">.</span>convert<span class="tok-o">(</span><span class="tok-s">&quot;RGB&quot;</span><span class="tok-o">)</span>
-
         label <span class="tok-o">=</span> item<span class="tok-o">[</span><span class="tok-s">&quot;label&quot;</span><span class="tok-o">]</span>
-
         <span class="tok-k">if</span> self<span class="tok-o">.</span>transform <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
             image <span class="tok-o">=</span> self<span class="tok-o">.</span>transform<span class="tok-o">(</span>image<span class="tok-o">)</span>
-
         <span class="tok-k">return</span> image<span class="tok-o">,</span> label
 
-
-
 dataset <span class="tok-o">=</span> <span class="tok-o">{</span>split<span class="tok-o">:</span> HFCIFAR10<span class="tok-o">(</span>split<span class="tok-o">=</span>split<span class="tok-o">,</span> transform<span class="tok-o">=</span>transforms<span class="tok-o">[</span>split<span class="tok-o">]</span><span class="tok-o">)</span>
-
            <span class="tok-k">for</span> split <span class="tok-k">in</span> <span class="tok-o">[</span><span class="tok-s">&quot;train&quot;</span><span class="tok-o">,</span> <span class="tok-s">&quot;test&quot;</span><span class="tok-o">]</span><span class="tok-o">}</span>
 
-
-
 dataloader <span class="tok-o">=</span> <span class="tok-o">{</span>
-
     split<span class="tok-o">:</span> DataLoader<span class="tok-o">(</span>dataset<span class="tok-o">[</span>split<span class="tok-o">]</span><span class="tok-o">,</span> batch_size<span class="tok-o">=</span><span class="tok-m">512</span><span class="tok-o">,</span>
-
                       shuffle<span class="tok-o">=</span><span class="tok-o">(</span>split<span class="tok-o">==</span><span class="tok-s">&#x27;train&#x27;</span><span class="tok-o">)</span><span class="tok-o">,</span>
-
                       num_workers<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">,</span> pin_memory<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
     <span class="tok-k">for</span> split <span class="tok-k">in</span> <span class="tok-o">[</span><span class="tok-s">&#x27;train&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span>
-
 <span class="tok-o">}</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="9"><h2>모델 로딩</h2>
 <p>사전 학습된 CNN 모델을 불러옵니다. 이 모델은 Pruning 기법을 적용하기 전 기준 모델로 사용됩니다. 본 실습에서는 VGG 구조의 모델을 사용하며, CIFAR-10 데이터셋으로 미리 학습된 가중치를 활용합니다. 모델의 연산 효율을 높이기 위해 GPU에서 실행되도록 설정합니다.</p></section><section class="nb-cell nb-code" data-cell="10"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">TORCH_HUB_REPO <span class="tok-o">=</span> <span class="tok-s">&quot;SKKU-ESLAB/pytorch-models&quot;</span>
-
 MODEL_NAME <span class="tok-o">=</span> <span class="tok-s">&quot;cifar10_vgg9_bn&quot;</span>
 
-
-
 model <span class="tok-o">=</span> torch<span class="tok-o">.</span>hub<span class="tok-o">.</span>load<span class="tok-o">(</span>TORCH_HUB_REPO<span class="tok-o">,</span> MODEL_NAME<span class="tok-o">,</span> pretrained<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
 <span class="tok-k">if</span> torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>is_available<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     model <span class="tok-o">=</span> model<span class="tok-o">.</span>cuda<span class="tok-o">(</span><span class="tok-o">)</span>
-
-
 
 <span class="tok-b">print</span><span class="tok-o">(</span>model<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="11"><h2>모델 크기 평가</h2>
 <p>모델의 총 파라미터 개수를 계산하여 모델의 크기를 평가합니다. 각 파라미터의 element 수를 더하여 총 개수를 구하고, 이를 통해 모델의 크기를 비트 단위로 변환합니다. 데이터 너비는 일반적으로 32비트(float)를 사용합니다. 이를 통해 모델이 차지하는 메모리 용량을 확인하고 프루닝의 필요성을 강조할 수 있으며, 프루닝 후 크기가 얼마나 감소했는지 정량적으로 평가할 수 있습니다.</p></section><section class="nb-cell nb-code" data-cell="12"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> get_num_parameters<span class="tok-o">(</span>model<span class="tok-o">:</span> nn<span class="tok-o">.</span>Module<span class="tok-o">,</span> count_nonzero_only<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-b">int</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     모델의 총 파라미터 수 계산
     &quot;&quot;&quot;</span>
-
     num_counted_elements <span class="tok-o">=</span> <span class="tok-m">0</span>
-
     <span class="tok-k">for</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         num_counted_elements <span class="tok-o">+=</span> param<span class="tok-o">.</span>count_nonzero<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-k">if</span> count_nonzero_only <span class="tok-k">else</span> param<span class="tok-o">.</span>numel<span class="tok-o">(</span><span class="tok-o">)</span>
-
     <span class="tok-k">return</span> num_counted_elements
 
-
-
 <span class="tok-k">def</span> get_model_size<span class="tok-o">(</span>model<span class="tok-o">:</span> nn<span class="tok-o">.</span>Module<span class="tok-o">,</span> data_width<span class="tok-o">=</span><span class="tok-m">32</span><span class="tok-o">,</span> count_nonzero_only<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-b">int</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     모델의 크기를 비트 단위로 계산
     &quot;&quot;&quot;</span>
-
     <span class="tok-k">return</span> get_num_parameters<span class="tok-o">(</span>model<span class="tok-o">,</span> count_nonzero_only<span class="tok-o">)</span> <span class="tok-o">*</span> data_width
 
-
-
 dense_model_size <span class="tok-o">=</span> get_model_size<span class="tok-o">(</span>model<span class="tok-o">)</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;dense model has size=<span class="tok-o">{</span>dense_model_size<span class="tok-o">/</span> <span class="tok-o">(</span><span class="tok-m">1024</span> <span class="tok-o">**</span> <span class="tok-m">2</span><span class="tok-o">)</span> <span class="tok-o">/</span> <span class="tok-m">8</span><span class="tok-o">:</span>.2f<span class="tok-o">}</span> MiB&quot;<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="13"><h2>모델의 정확도 평가</h2>
 <p>모델의 성능을 평가하기 위해 정확도를 측정합니다. 테스트 데이터셋을 사용하여 모델의 예측 정확성을 검증합니다. 모델 학습을 위한 <code>train</code> 함수와 성능 평가를 위한 <code>evaluate</code> 함수를 구현합니다. 이를 통해 프루닝 전후의 모델 정확도를 비교하여 성능 변화를 분석할 수 있습니다. 특히 프루닝으로 인한 정확도 손실과 모델 크기 감소의 trade-off 관계를 파악할 수 있습니다.</p></section><section class="nb-cell nb-code" data-cell="14"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> train<span class="tok-o">(</span>
-
     model<span class="tok-o">:</span> nn<span class="tok-o">.</span>Module<span class="tok-o">,</span>
-
     dataloader<span class="tok-o">:</span> DataLoader<span class="tok-o">,</span>
-
     criterion<span class="tok-o">:</span> nn<span class="tok-o">.</span>Module<span class="tok-o">,</span>
-
     optimizer<span class="tok-o">:</span> Optimizer<span class="tok-o">,</span>
-
     scheduler<span class="tok-o">:</span> LambdaLR<span class="tok-o">,</span>
-
     callbacks<span class="tok-o">=</span><span class="tok-k">None</span><span class="tok-o">,</span>
-
 <span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
     model<span class="tok-o">.</span>train<span class="tok-o">(</span><span class="tok-o">)</span>
-
     <span class="tok-k">for</span> inputs<span class="tok-o">,</span> targets <span class="tok-k">in</span> tqdm<span class="tok-o">(</span>dataloader<span class="tok-o">,</span> desc<span class="tok-o">=</span><span class="tok-s">&#x27;Train&#x27;</span><span class="tok-o">,</span> leave<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>is_available<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             inputs<span class="tok-o">,</span> targets <span class="tok-o">=</span> inputs<span class="tok-o">.</span>cuda<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> targets<span class="tok-o">.</span>cuda<span class="tok-o">(</span><span class="tok-o">)</span>
-
         optimizer<span class="tok-o">.</span>zero_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
         outputs <span class="tok-o">=</span> model<span class="tok-o">(</span>inputs<span class="tok-o">)</span>
-
         loss <span class="tok-o">=</span> criterion<span class="tok-o">(</span>outputs<span class="tok-o">,</span> targets<span class="tok-o">)</span>
-
         loss<span class="tok-o">.</span>backward<span class="tok-o">(</span><span class="tok-o">)</span>
-
         optimizer<span class="tok-o">.</span>step<span class="tok-o">(</span><span class="tok-o">)</span>
-
         scheduler<span class="tok-o">.</span>step<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">if</span> callbacks <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
             <span class="tok-k">for</span> callback <span class="tok-k">in</span> callbacks<span class="tok-o">:</span>
-
                 callback<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> evaluate<span class="tok-o">(</span>
-
     model<span class="tok-o">:</span> nn<span class="tok-o">.</span>Module<span class="tok-o">,</span>
-
     dataloader<span class="tok-o">:</span> DataLoader<span class="tok-o">,</span>
-
     verbose<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">,</span>
-
 <span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-b">float</span><span class="tok-o">:</span>
-
     model<span class="tok-o">.</span>eval<span class="tok-o">(</span><span class="tok-o">)</span>
-
     num_samples<span class="tok-o">,</span> num_correct <span class="tok-o">=</span> <span class="tok-m">0</span><span class="tok-o">,</span> <span class="tok-m">0</span>
-
     <span class="tok-k">for</span> inputs<span class="tok-o">,</span> targets <span class="tok-k">in</span> tqdm<span class="tok-o">(</span>dataloader<span class="tok-o">,</span> desc<span class="tok-o">=</span><span class="tok-s">&quot;Eval&quot;</span><span class="tok-o">,</span> leave<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span> disable<span class="tok-o">=</span><span class="tok-k">not</span> verbose<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>is_available<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             inputs<span class="tok-o">,</span> targets <span class="tok-o">=</span> inputs<span class="tok-o">.</span>cuda<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> targets<span class="tok-o">.</span>cuda<span class="tok-o">(</span><span class="tok-o">)</span>
-
         outputs <span class="tok-o">=</span> model<span class="tok-o">(</span>inputs<span class="tok-o">)</span>
-
         preds <span class="tok-o">=</span> outputs<span class="tok-o">.</span>argmax<span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">)</span>
-
         num_samples <span class="tok-o">+=</span> targets<span class="tok-o">.</span>size<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">)</span>
-
         num_correct <span class="tok-o">+=</span> <span class="tok-o">(</span>preds <span class="tok-o">==</span> targets<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span>
-
-    <span class="tok-k">return</span> <span class="tok-o">(</span>num_correct <span class="tok-o">/</span> num_samples <span class="tok-o">*</span> <span class="tok-m">100</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-code" data-cell="15"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">dense_model_accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
+    <span class="tok-k">return</span> <span class="tok-o">(</span>num_correct <span class="tok-o">/</span> num_samples <span class="tok-o">*</span> <span class="tok-m">100</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="15"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">dense_model_accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span>
 <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;dense model has accuracy=<span class="tok-o">{</span>dense_model_accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="16"><h2>모델 가중치 값의 분포 확인</h2>
 <p>모델의 가중치 분포를 시각적으로 확인하겠습니다. 가중치 값들을 히스토그램으로 표현하여 분포를 파악할 수 있습니다. 이는 프루닝(Pruning) 대상을 선정하는데 중요한 기준이 됩니다. 예를 들어, 매우 작은 값을 가진 가중치들은 프루닝 과정에서 우선적으로 제거될 수 있습니다.</p>
 <p>여기서 <code>param.dim() &gt; 1</code> 조건은 2차원 이상의 파라미터만 검사한다는 의미입니다. CNN에서 파라미터는 다음과 같이 구성됩니다:</p>
@@ -284,7 +168,6 @@ dense_model_size <span class="tok-o">=</span> get_model_size<span class="tok-o">
   if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
     param = m.weight
     ...</code></pre></section><section class="nb-cell nb-code" data-cell="17"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> plot_weight_distribution<span class="tok-o">(</span>model<span class="tok-o">,</span> bins<span class="tok-o">=</span><span class="tok-m">256</span><span class="tok-o">,</span> count_nonzero_only<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;가중치 분포를 시각화하는 함수
 
     Args:
@@ -292,123 +175,70 @@ dense_model_size <span class="tok-o">=</span> get_model_size<span class="tok-o">
         bins: 히스토그램의 구간 수 (기본값: 256)
         count_nonzero_only: 0이 아닌 가중치만 표시할지 여부 (기본값: False)
     &quot;&quot;&quot;</span>
-
     <span class="tok-c"># 3x3 서브플롯 생성</span>
-
     fig<span class="tok-o">,</span> axes <span class="tok-o">=</span> plt<span class="tok-o">.</span>subplots<span class="tok-o">(</span><span class="tok-m">3</span><span class="tok-o">,</span> <span class="tok-m">3</span><span class="tok-o">,</span> figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">10</span><span class="tok-o">,</span> <span class="tok-m">6</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
     axes <span class="tok-o">=</span> axes<span class="tok-o">.</span>ravel<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     plot_index <span class="tok-o">=</span> <span class="tok-m">0</span>
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-c"># 2차원 이상의 파라미터만 처리 (Conv2d, Linear 레이어의 가중치)</span>
-
         <span class="tok-k">if</span> param<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">:</span>
-
             ax <span class="tok-o">=</span> axes<span class="tok-o">[</span>plot_index<span class="tok-o">]</span>
 
-
-
             <span class="tok-c"># CPU로 데이터 이동 및 1차원으로 변환</span>
-
             param_data <span class="tok-o">=</span> param<span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">.</span>cpu<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
             <span class="tok-k">if</span> count_nonzero_only<span class="tok-o">:</span>
-
                 <span class="tok-c"># 0이 아닌 값만 선택</span>
-
                 param_data <span class="tok-o">=</span> param_data<span class="tok-o">[</span>param_data <span class="tok-o">!=</span> <span class="tok-m">0</span><span class="tok-o">]</span>
 
-
-
             <span class="tok-c"># 히스토그램 그리기</span>
-
             ax<span class="tok-o">.</span>hist<span class="tok-o">(</span>param_data<span class="tok-o">,</span> bins<span class="tok-o">=</span>bins<span class="tok-o">,</span> density<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">,</span>
-
                    color<span class="tok-o">=</span><span class="tok-s">&#x27;blue&#x27;</span><span class="tok-o">,</span> alpha<span class="tok-o">=</span><span class="tok-m">0.5</span><span class="tok-o">)</span>
 
-
-
             <span class="tok-c"># 축 레이블 설정</span>
-
             ax<span class="tok-o">.</span>set_xlabel<span class="tok-o">(</span>name<span class="tok-o">)</span>
-
             ax<span class="tok-o">.</span>set_ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;density&#x27;</span><span class="tok-o">)</span>
-
             plot_index <span class="tok-o">+=</span> <span class="tok-m">1</span>
-
     fig<span class="tok-o">.</span>suptitle<span class="tok-o">(</span><span class="tok-s">&#x27;Histogram of Weights&#x27;</span><span class="tok-o">)</span>
-
     fig<span class="tok-o">.</span>tight_layout<span class="tok-o">(</span><span class="tok-o">)</span>
-
     fig<span class="tok-o">.</span>subplots_adjust<span class="tok-o">(</span>top<span class="tok-o">=</span><span class="tok-m">0.925</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span>
-
-
 
 plot_weight_distribution<span class="tok-o">(</span>model<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="18"><p>이로써 실습을 위한 기본적인 준비는 모두 마무리 되었습니다.</p></section><section class="nb-cell nb-markdown" data-cell="19"><h2>Reconstruction Error 계산 함수 정의</h2>
 <p>실습에 들어가기 앞서 <strong>reconstruction error</strong>를 계산하는 함수를 정의하겠습니다. Reconstruction error는 프루닝 전후 모델 출력의 차이를 측정하여 프루닝이 모델의 성능에 미치는 영향을 정량적으로 평가하는 지표입니다.</p>
 <p>Input feature map $X$에 대해 원본 weight $W$와 pruning된 weight $\widehat{W}$ 사이의 reconstruction error는 다음 수식으로 계산됩니다:</p>
 <p>${\left\Vert WX - \widehat{W}X \right\Vert}^2_2$</p>
 <p>이 값이 작을수록 프루닝 후에도 원래 모델의 출력과 유사한 결과를 유지한다는 것을 의미합니다.</p></section><section class="nb-cell nb-code" data-cell="20"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> get_reconstuction_error<span class="tok-o">(</span>tensor1<span class="tok-o">:</span> torch<span class="tok-o">.</span>Tensor<span class="tok-o">,</span> tensor2<span class="tok-o">:</span> torch<span class="tok-o">.</span>Tensor<span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-b">float</span><span class="tok-o">:</span>
-
-    <span class="tok-k">return</span> torch<span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">(</span>tensor1 <span class="tok-o">-</span> tensor2<span class="tok-o">)</span> <span class="tok-o">**</span> <span class="tok-m">2</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="21"><h1>1.1. Pruning Granularity/Pattern</h1>
+    <span class="tok-k">return</span> torch<span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">(</span>tensor1 <span class="tok-o">-</span> tensor2<span class="tok-o">)</span> <span class="tok-o">**</span> <span class="tok-m">2</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="21"><h1>1.1. Pruning Granularity/Pattern</h1>
 <p>이 섹션에서는 Pruning을 수행할 때 다양한 granularity(세분성)를 적용하는 방법을 배웁니다. 각 granularity는 모델의 정확도(accuracy)와 하드웨어 효율성(hardware efficiency)에 영향을 미치므로, 적절한 선택이 중요합니다.</p></section><section class="nb-cell nb-markdown" data-cell="22"><h2>Pruning Granularity 소개</h2>
 <p>Pruning granularity는 Pruning이 적용되는 범위를 정의합니다. 다음과 같은 다양한 단위로 Pruning을 적용할 수 있습니다:</p>
 <ul><li><strong>Fine-grained Pruning</strong>: 가장 작은 단위인 개별 가중치를 대상으로 합니다.</li><li><strong>Vector-level Pruning</strong>: 가중치 벡터 단위로 Pruning을 수행합니다.</li><li><strong>Kernel-level Pruning</strong>: 컨볼루션 커널 전체를 대상으로 합니다.</li><li><strong>Channel-level Pruning</strong>: 전체 채널을 Pruning 대상으로 합니다.</li></ul>
 <p>각 단위는 Pruning이 모델의 구조와 성능에 미치는 영향을 다르게 하므로, 실험을 통해 각 경우의 효과를 비교해 볼 필요가 있습니다.</p></section><section class="nb-cell nb-markdown" data-cell="23"><h2>Pruning Pattern의 시각화</h2>
 <p>다음 그림은 다양한 Pruning pattern을 보여줍니다. 이를 통해 각 Pruning 기법의 특징을 시각적으로 이해할 수 있습니다.</p>
 <p><img src="https://github.com/SKKU-ESLAB/pytorch-models/blob/main/pruning_granularity.png?raw=true" alt="Pruning Granularity"></p></section><section class="nb-cell nb-markdown" data-cell="24"><p>본 실습에서는 가중치의 크기(Magnitude)를 기준으로 하는 중요도 점수를 사용합니다. Sparsity를 0.5로 설정하여 <code>model.backbone.conv1.weight</code>의 50%에 해당하는 가중치를 제거(Pruning)합니다. 이는 가중치의 절반을 0으로 만들어 모델을 희소화하는 과정입니다.</p></section><section class="nb-cell nb-code" data-cell="25"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">prune_sparsity <span class="tok-o">=</span> <span class="tok-m">0.5</span>
-
 weight <span class="tok-o">=</span> model<span class="tok-o">.</span>backbone<span class="tok-o">.</span>conv1<span class="tok-o">.</span>weight
-
 <span class="tok-b">print</span><span class="tok-o">(</span>weight<span class="tok-o">.</span>shape<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="26"><h2>가중치 분포 시각화</h2>
 <p>Pruning을 수행하기 전에 가중치의 분포를 시각화하여 중요한 가중치들을 파악하고 Pruning이 미치는 영향을 분석합니다. 아래 함수를 통해 가중치의 분포를 시각적으로 확인할 수 있습니다:</p></section><section class="nb-cell nb-code" data-cell="27"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> draw_weight_distribution<span class="tok-o">(</span>weight_tensor<span class="tok-o">,</span> title<span class="tok-o">=</span><span class="tok-s">&quot;Weight Distribution&quot;</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     weights <span class="tok-o">=</span> weight_tensor<span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>cpu<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>numpy<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 4D 텐서인 경우 2D로 재구성</span>
-
     <span class="tok-k">if</span> <span class="tok-b">len</span><span class="tok-o">(</span>weights<span class="tok-o">.</span>shape<span class="tok-o">)</span> <span class="tok-o">==</span> <span class="tok-m">4</span><span class="tok-o">:</span>
-
         co<span class="tok-o">,</span> ci<span class="tok-o">,</span> kh<span class="tok-o">,</span> kw <span class="tok-o">=</span> weights<span class="tok-o">.</span>shape
-
         weights <span class="tok-o">=</span> weights<span class="tok-o">.</span>transpose<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">,</span> <span class="tok-m">2</span><span class="tok-o">,</span> <span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-m">3</span><span class="tok-o">)</span><span class="tok-o">.</span>reshape<span class="tok-o">(</span>co <span class="tok-o">*</span> kh<span class="tok-o">,</span> ci <span class="tok-o">*</span> kw<span class="tok-o">)</span>
 
-
-
     plt<span class="tok-o">.</span>figure<span class="tok-o">(</span>figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">8</span><span class="tok-o">,</span> <span class="tok-m">6</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>imshow<span class="tok-o">(</span>weights<span class="tok-o">,</span> cmap<span class="tok-o">=</span><span class="tok-s">&#x27;hot&#x27;</span><span class="tok-o">,</span> interpolation<span class="tok-o">=</span><span class="tok-s">&#x27;nearest&#x27;</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>colorbar<span class="tok-o">(</span>label<span class="tok-o">=</span><span class="tok-s">&#x27;Magnitude of Weight Values&#x27;</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>title<span class="tok-o">(</span>title<span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>xlabel<span class="tok-o">(</span><span class="tok-s">&quot;Column Index&quot;</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&quot;Row Index&quot;</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 가중치의 절댓값 분포 시각화</span>
-
 draw_weight_distribution<span class="tok-o">(</span>weight<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="28"><h2>[실습 1] Fine-grained Pruning 구현</h2>
 <p>Fine-grained Pruning은 신경망의 가중치를 개별적으로 제거하는 기법입니다. 각 가중치의 크기(Magnitude)를 기준으로 중요도를 평가하고, 지정된 희소도(sparsity)에 따라 중요도가 낮은 가중치들을 0으로 만듭니다. 이를 통해 모델의 크기를 줄이고 연산량을 감소시킬 수 있습니다.</p>
 <p>아래 빈칸을 채워 <code>prune_weight_fine_grained</code> 함수를 완성하세요.</p></section><section class="nb-cell nb-code" data-cell="29"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> prune_weight_fine_grained<span class="tok-o">(</span>weight<span class="tok-o">:</span> torch<span class="tok-o">.</span>Tensor<span class="tok-o">,</span> sparsity<span class="tok-o">:</span> <span class="tok-b">float</span><span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;가중치 텐서에 대해 fine-grained pruning을 수행하는 함수
 
     Args:
@@ -418,80 +248,43 @@ draw_weight_distribution<span class="tok-o">(</span>weight<span class="tok-o">.<
     Returns:
         pruning mask 텐서
     &quot;&quot;&quot;</span>
-
     <span class="tok-c"># sparsity 값을 0~1 사이로 제한</span>
-
     sparsity <span class="tok-o">=</span> <span class="tok-b">min</span><span class="tok-o">(</span><span class="tok-m">1.0</span><span class="tok-o">,</span> <span class="tok-b">max</span><span class="tok-o">(</span><span class="tok-m">0.0</span><span class="tok-o">,</span> sparsity<span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 특수한 경우 처리</span>
-
     <span class="tok-k">if</span> sparsity <span class="tok-o">==</span> <span class="tok-m">1.0</span><span class="tok-o">:</span>  <span class="tok-c"># 모든 가중치를 제거</span>
-
         weight<span class="tok-o">.</span>zero_<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>zeros_like<span class="tok-o">(</span>weight<span class="tok-o">)</span>
-
     <span class="tok-k">elif</span> sparsity <span class="tok-o">==</span> <span class="tok-m">0.0</span><span class="tok-o">:</span>  <span class="tok-c"># 모든 가중치를 유지</span>
-
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>ones_like<span class="tok-o">(</span>weight<span class="tok-o">)</span>
 
-
-
     <span class="tok-c">##################### YOUR CODE STARTS HERE #####################</span>
-
     <span class="tok-c"># 제거할 원소 개수를 계산하세요.</span>
-
     <span class="tok-c"># hint: round() 함수를 사용하세요.</span>
-
     num_pruned_elements <span class="tok-o">=</span>
 
-
-
     <span class="tok-c"># 가중치의 중요도를 절댓값으로 importance 계산</span>
-
     <span class="tok-c"># hint: torch.abs() 함수를 사용하세요.</span>
-
     importance <span class="tok-o">=</span>
 
-
-
     <span class="tok-c"># pruning trheshold를 계산하세요.</span>
-
     <span class="tok-c"># hint: torch.kthvalue() 함수를 사용하세요.</span>
-
     threshold <span class="tok-o">=</span>
 
-
-
     <span class="tok-c"># threshold보다 큰 값들은 유지(1), 작은 값들은 제거(0)하는 마스크 생성</span>
-
     <span class="tok-c"># hint: 부등호를 사용하세요.</span>
-
     mask <span class="tok-o">=</span>
-
     <span class="tok-c">##################### YOUR CODE ENDS HERE #######################</span>
 
-
-
     <span class="tok-c"># 마스크를 적용하여 pruning 수행</span>
-
     weight<span class="tok-o">.</span>mul_<span class="tok-o">(</span>mask<span class="tok-o">)</span>
-
-
 
     <span class="tok-k">return</span> mask
 
-
-
 <span class="tok-c"># 마스크 생성 및 시각화</span>
-
 mask_fine_grained <span class="tok-o">=</span> prune_weight_fine_grained<span class="tok-o">(</span>weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> prune_sparsity<span class="tok-o">)</span>
-
 draw_weight_distribution<span class="tok-o">(</span>mask_fine_grained<span class="tok-o">,</span> title<span class="tok-o">=</span><span class="tok-s">&quot;Fine-grained Pruning Mask&quot;</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="30"><h2>Vector-level Pruning</h2>
 <p>Vector-level Pruning은 가중치 벡터 단위로 Pruning을 수행하는 기법입니다. 이 방법은 fine-grained Pruning과 비교했을 때 구조적인 정보를 더 잘 보존할 수 있다는 장점이 있습니다. 각 가중치 벡터의 L1 norm(절대값의 합)을 기준으로 중요도를 평가하고, 중요도가 낮은 벡터들을 제거함으로써 Pruning을 수행합니다. 이러한 방식으로 네트워크의 구조적 특성을 유지하면서 모델을 경량화할 수 있습니다.</p></section><section class="nb-cell nb-code" data-cell="31"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> prune_weight_vector_level<span class="tok-o">(</span>weight<span class="tok-o">:</span> torch<span class="tok-o">.</span>Tensor<span class="tok-o">,</span> sparsity<span class="tok-o">:</span> <span class="tok-b">float</span><span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;벡터 단위로 가중치를 프루닝하는 함수입니다.
 
     Args:
@@ -501,74 +294,40 @@ draw_weight_distribution<span class="tok-o">(</span>mask_fine_grained<span class
     Returns:
         프루닝 마스크 텐서
     &quot;&quot;&quot;</span>
-
     <span class="tok-c"># sparsity 값을 0~1 사이로 제한</span>
-
     sparsity <span class="tok-o">=</span> <span class="tok-b">min</span><span class="tok-o">(</span><span class="tok-m">1.0</span><span class="tok-o">,</span> <span class="tok-b">max</span><span class="tok-o">(</span><span class="tok-m">0.0</span><span class="tok-o">,</span> sparsity<span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 특수한 경우 처리</span>
-
     <span class="tok-k">if</span> sparsity <span class="tok-o">==</span> <span class="tok-m">1.0</span><span class="tok-o">:</span>  <span class="tok-c"># 모든 가중치를 제거</span>
-
         weight<span class="tok-o">.</span>zero_<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>zeros_like<span class="tok-o">(</span>weight<span class="tok-o">)</span>
-
     <span class="tok-k">elif</span> sparsity <span class="tok-o">==</span> <span class="tok-m">0.0</span><span class="tok-o">:</span>  <span class="tok-c"># 모든 가중치를 유지</span>
-
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>ones_like<span class="tok-o">(</span>weight<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 제거할 벡터의 개수 계산</span>
-
     num_vectors <span class="tok-o">=</span> weight<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span> <span class="tok-o">*</span> weight<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-m">1</span><span class="tok-o">]</span> <span class="tok-o">*</span> weight<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-m">2</span><span class="tok-o">]</span>
-
     num_pruned_vectors <span class="tok-o">=</span> <span class="tok-b">round</span><span class="tok-o">(</span>num_vectors <span class="tok-o">*</span> sparsity<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 각 벡터의 중요도를 절댓값 합으로 계산</span>
-
     importance <span class="tok-o">=</span> weight<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">3</span><span class="tok-o">,</span><span class="tok-o">)</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># pruning trheshold를 계산</span>
-
     threshold <span class="tok-o">=</span> torch<span class="tok-o">.</span>kthvalue<span class="tok-o">(</span>importance<span class="tok-o">.</span>flatten<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> num_pruned_vectors<span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
 
-
-
     <span class="tok-c"># threshold보다 큰 벡터는 유지(1), 작은 벡터는 제거(0)</span>
-
     mask <span class="tok-o">=</span> importance <span class="tok-o">&gt;</span> threshold
 
-
-
     <span class="tok-c"># 마스크를 가중치와 동일한 크기로 확장</span>
-
     mask <span class="tok-o">=</span> mask<span class="tok-o">.</span>expand_as<span class="tok-o">(</span>weight<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 마스크를 적용하여 프루닝 수행</span>
-
     weight<span class="tok-o">.</span>mul_<span class="tok-o">(</span>mask<span class="tok-o">)</span>
-
-
 
     <span class="tok-k">return</span> mask
 
-
-
 mask_vector_level <span class="tok-o">=</span> prune_weight_vector_level<span class="tok-o">(</span>weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> prune_sparsity<span class="tok-o">)</span>
-
 draw_weight_distribution<span class="tok-o">(</span>mask_vector_level<span class="tok-o">,</span> title<span class="tok-o">=</span><span class="tok-s">&quot;Vector-level Pruning Mask&quot;</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="32"><h2>Kernel-level Pruning</h2>
 <p>Kernel-level Pruning은 컨볼루션 커널을 기준으로 프루닝을 수행하는 방법입니다. 벡터 단위 프루닝보다 더 큰 구조적 단위로 프루닝을 수행하기 때문에 하드웨어 가속과 연산 최적화에 더 효과적입니다. 각 커널의 가중치 절댓값 총합을 중요도로 사용하여 불필요한 커널을 제거합니다.</p></section><section class="nb-cell nb-code" data-cell="33"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> prune_weight_kernel_level<span class="tok-o">(</span>weight<span class="tok-o">:</span> torch<span class="tok-o">.</span>Tensor<span class="tok-o">,</span> sparsity<span class="tok-o">:</span> <span class="tok-b">float</span><span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;커널 단위로 가중치를 프루닝하는 함수
 
     Args:
@@ -578,68 +337,37 @@ draw_weight_distribution<span class="tok-o">(</span>mask_vector_level<span class
     Returns:
         프루닝 마스크 텐서
     &quot;&quot;&quot;</span>
-
     sparsity <span class="tok-o">=</span> <span class="tok-b">min</span><span class="tok-o">(</span><span class="tok-m">1.0</span><span class="tok-o">,</span> <span class="tok-b">max</span><span class="tok-o">(</span><span class="tok-m">0.0</span><span class="tok-o">,</span> sparsity<span class="tok-o">)</span><span class="tok-o">)</span>
-
     <span class="tok-k">if</span> sparsity <span class="tok-o">==</span> <span class="tok-m">1.0</span><span class="tok-o">:</span>
-
         weight<span class="tok-o">.</span>zero_<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>zeros_like<span class="tok-o">(</span>weight<span class="tok-o">)</span>
-
     <span class="tok-k">elif</span> sparsity <span class="tok-o">==</span> <span class="tok-m">0.0</span><span class="tok-o">:</span>
-
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>ones_like<span class="tok-o">(</span>weight<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 프루닝할 커널 수 계산</span>
-
     num_kernels <span class="tok-o">=</span> weight<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span> <span class="tok-o">*</span> weight<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-m">1</span><span class="tok-o">]</span>
-
     num_pruned_kernels <span class="tok-o">=</span> <span class="tok-b">round</span><span class="tok-o">(</span>num_kernels <span class="tok-o">*</span> sparsity<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 각 커널의 중요도를 절댓값 합으로 계산 (커널 크기에 대해 합산)</span>
-
     importance <span class="tok-o">=</span> weight<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">2</span><span class="tok-o">,</span> <span class="tok-m">3</span><span class="tok-o">)</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># pruning trheshold를 계산</span>
-
     threshold <span class="tok-o">=</span> torch<span class="tok-o">.</span>kthvalue<span class="tok-o">(</span>importance<span class="tok-o">.</span>flatten<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> num_pruned_kernels<span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
 
-
-
     <span class="tok-c"># threshold보다 큰 커널은 유지(1), 작은 커널은 제거(0)</span>
-
     mask <span class="tok-o">=</span> importance <span class="tok-o">&gt;</span> threshold
 
-
-
     <span class="tok-c"># 마스크를 가중치와 동일한 크기로 확장</span>
-
     mask <span class="tok-o">=</span> mask<span class="tok-o">.</span>expand_as<span class="tok-o">(</span>weight<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 마스크를 적용하여 프루닝 수행</span>
-
     weight<span class="tok-o">.</span>mul_<span class="tok-o">(</span>mask<span class="tok-o">)</span>
-
-
 
     <span class="tok-k">return</span> mask
 
-
-
 mask_kernel_level <span class="tok-o">=</span> prune_weight_kernel_level<span class="tok-o">(</span>weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> prune_sparsity<span class="tok-o">)</span>
-
 draw_weight_distribution<span class="tok-o">(</span>mask_kernel_level<span class="tok-o">,</span> title<span class="tok-o">=</span><span class="tok-s">&quot;Kernel-level Pruning Mask&quot;</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="34"><h2>Channel-level Pruning</h2>
 <p>Channel-level Pruning은 입력 또는 출력 채널 전체를 Pruning 대상으로 합니다. 채널 단위로 프루닝을 수행하면 해당 채널과 관련된 모든 연산이 제거되므로 모델의 효율성을 향상시킬 수 있습니다.</p></section><section class="nb-cell nb-code" data-cell="35"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> prune_weight_channel_level<span class="tok-o">(</span>weight<span class="tok-o">:</span> torch<span class="tok-o">.</span>Tensor<span class="tok-o">,</span> sparsity<span class="tok-o">:</span> <span class="tok-b">float</span><span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-k">None</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;채널 단위 프루닝을 수행하는 함수
 
     Args:
@@ -649,185 +377,97 @@ draw_weight_distribution<span class="tok-o">(</span>mask_kernel_level<span class
     Returns:
         프루닝 마스크 텐서
     &quot;&quot;&quot;</span>
-
     sparsity <span class="tok-o">=</span> <span class="tok-b">min</span><span class="tok-o">(</span><span class="tok-m">1.0</span><span class="tok-o">,</span> <span class="tok-b">max</span><span class="tok-o">(</span><span class="tok-m">0.0</span><span class="tok-o">,</span> sparsity<span class="tok-o">)</span><span class="tok-o">)</span>
-
     <span class="tok-k">if</span> sparsity <span class="tok-o">==</span> <span class="tok-m">1.0</span><span class="tok-o">:</span>
-
         weight<span class="tok-o">.</span>zero_<span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>zeros_like<span class="tok-o">(</span>weight<span class="tok-o">)</span>
-
     <span class="tok-k">elif</span> sparsity <span class="tok-o">==</span> <span class="tok-m">0.0</span><span class="tok-o">:</span>
-
         <span class="tok-k">return</span> torch<span class="tok-o">.</span>ones_like<span class="tok-o">(</span>weight<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 프루닝할 채널 수 계산</span>
-
     num_channels <span class="tok-o">=</span> weight<span class="tok-o">.</span>shape<span class="tok-o">[</span><span class="tok-m">1</span><span class="tok-o">]</span>
-
     num_pruned_channels <span class="tok-o">=</span> <span class="tok-b">round</span><span class="tok-o">(</span>num_channels <span class="tok-o">*</span> sparsity<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 각 채널의 중요도를 절댓값 합으로 계산</span>
-
     <span class="tok-c"># (출력 채널, 커널 높이, 커널 너비에 대해 합산)</span>
-
     importance <span class="tok-o">=</span> weight<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span>dim<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">,</span> <span class="tok-m">2</span><span class="tok-o">,</span> <span class="tok-m">3</span><span class="tok-o">)</span><span class="tok-o">,</span> keepdim<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># pruning threshold를 계산</span>
-
     threshold <span class="tok-o">=</span> torch<span class="tok-o">.</span>kthvalue<span class="tok-o">(</span>importance<span class="tok-o">.</span>flatten<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> num_pruned_channels<span class="tok-o">)</span><span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span>
 
-
-
     <span class="tok-c"># threshold보다 큰 채널은 유지(1), 작은 채널은 제거(0)</span>
-
     mask <span class="tok-o">=</span> importance <span class="tok-o">&gt;</span> threshold
 
-
-
     <span class="tok-c"># 마스크를 가중치와 동일한 크기로 확장</span>
-
     mask <span class="tok-o">=</span> mask<span class="tok-o">.</span>expand_as<span class="tok-o">(</span>weight<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 마스크를 적용하여 프루닝 수행</span>
-
     weight<span class="tok-o">.</span>mul_<span class="tok-o">(</span>mask<span class="tok-o">)</span>
-
-
 
     <span class="tok-k">return</span> mask
 
-
-
 mask_channel_level <span class="tok-o">=</span> prune_weight_channel_level<span class="tok-o">(</span>weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> prune_sparsity<span class="tok-o">)</span>
-
 draw_weight_distribution<span class="tok-o">(</span>mask_channel_level<span class="tok-o">,</span> title<span class="tok-o">=</span><span class="tok-s">&quot;Channel-level Pruning Mask&quot;</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="36"><h2>중요도 합 비교</h2>
 <p>각 프루닝 기법에 따라 제거된 가중치의 중요도 합을 비교합니다. 이를 통해 각 프루닝 방법이 얼마나 중요한 가중치를 제거하는지 파악할 수 있습니다. 중요도가 높은 가중치를 많이 제거할수록 모델의 성능 저하가 클 것으로 예상됩니다.</p></section><section class="nb-cell nb-code" data-cell="37"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># 가중치의 중요도를 절댓값으로 계산</span>
-
 importance <span class="tok-o">=</span> weight<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 각 프루닝 방법별 중요도 합 계산</span>
-
 importance_sum <span class="tok-o">=</span> importance<span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># 원본</span>
-
 importance_sum_fine_grained <span class="tok-o">=</span> <span class="tok-o">(</span>importance <span class="tok-o">*</span> mask_fine_grained<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># 미세 단위</span>
-
 importance_sum_vector_level <span class="tok-o">=</span> <span class="tok-o">(</span>importance <span class="tok-o">*</span> mask_vector_level<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># 벡터 단위</span>
-
 importance_sum_kernel_level <span class="tok-o">=</span> <span class="tok-o">(</span>importance <span class="tok-o">*</span> mask_kernel_level<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># 커널 단위</span>
-
 importance_sum_channel_level <span class="tok-o">=</span> <span class="tok-o">(</span>importance <span class="tok-o">*</span> mask_channel_level<span class="tok-o">)</span><span class="tok-o">.</span><span class="tok-b">sum</span><span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>item<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># 채널 단위</span>
 
-
-
 plt<span class="tok-o">.</span>figure<span class="tok-o">(</span>figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">8</span><span class="tok-o">,</span> <span class="tok-m">6</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>bar<span class="tok-o">(</span><span class="tok-o">[</span><span class="tok-s">&#x27;Original&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;Fine-grained&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;Vector-level&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;Kernel-level&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;Channel-level&#x27;</span><span class="tok-o">]</span><span class="tok-o">,</span>
-
         <span class="tok-o">[</span>importance_sum<span class="tok-o">,</span> importance_sum_fine_grained<span class="tok-o">,</span> importance_sum_vector_level<span class="tok-o">,</span>
-
          importance_sum_kernel_level<span class="tok-o">,</span> importance_sum_channel_level<span class="tok-o">]</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;Importance Sum&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>title<span class="tok-o">(</span><span class="tok-s">&#x27;Importance Sum of Different Pruning Methods&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="38"><h2>Reconstruction Error 비교</h2>
 <p>각 Pruning 기법을 적용한 후, 모델 출력의 reconstruction error를 비교합니다. 이를 통해 각 Pruning 방법이 모델의 출력에 미치는 영향을 정량적으로 평가할 수 있습니다. Reconstruction error가 클수록 원본 모델의 출력과 더 많이 달라졌음을 의미하며, 이는 해당 Pruning 방법이 모델의 성능에 더 큰 영향을 미칠 수 있음을 나타냅니다.</p></section><section class="nb-cell nb-code" data-cell="39"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># 랜덤 입력 샘플 생성</span>
-
 input_sample <span class="tok-o">=</span> torch<span class="tok-o">.</span>randn<span class="tok-o">(</span><span class="tok-m">1</span><span class="tok-o">,</span> <span class="tok-m">64</span><span class="tok-o">,</span> <span class="tok-m">32</span><span class="tok-o">,</span> <span class="tok-m">32</span><span class="tok-o">,</span> device<span class="tok-o">=</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 원본 컨볼루션 레이어 생성 및 출력 계산</span>
-
 conv_original <span class="tok-o">=</span> nn<span class="tok-o">.</span>Conv2d<span class="tok-o">(</span><span class="tok-m">64</span><span class="tok-o">,</span> <span class="tok-m">128</span><span class="tok-o">,</span> kernel_size<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> padding<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">,</span> bias<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span> device<span class="tok-o">=</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
-
 conv_original<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span>
-
 output_original <span class="tok-o">=</span> conv_original<span class="tok-o">(</span>input_sample<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Fine-grained 프루닝 적용 및 재구성 오차 계산</span>
-
 conv_pruned_fine_grained <span class="tok-o">=</span> nn<span class="tok-o">.</span>Conv2d<span class="tok-o">(</span><span class="tok-m">64</span><span class="tok-o">,</span> <span class="tok-m">128</span><span class="tok-o">,</span> kernel_size<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> padding<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">,</span> bias<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span> device<span class="tok-o">=</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
-
 conv_pruned_fine_grained<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">*</span> mask_fine_grained
-
 output_pruned_fine_grained <span class="tok-o">=</span> conv_pruned_fine_grained<span class="tok-o">(</span>input_sample<span class="tok-o">)</span>
-
 reconstruction_error_fine_grained <span class="tok-o">=</span> get_reconstuction_error<span class="tok-o">(</span>output_original<span class="tok-o">,</span> output_pruned_fine_grained<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Vector-level 프루닝 적용 및 재구성 오차 계산</span>
-
 conv_pruned_vector_level <span class="tok-o">=</span> nn<span class="tok-o">.</span>Conv2d<span class="tok-o">(</span><span class="tok-m">64</span><span class="tok-o">,</span> <span class="tok-m">128</span><span class="tok-o">,</span> kernel_size<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> padding<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">,</span> bias<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span> device<span class="tok-o">=</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
-
 conv_pruned_vector_level<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">*</span> mask_vector_level
-
 output_pruned_vector_level <span class="tok-o">=</span> conv_pruned_vector_level<span class="tok-o">(</span>input_sample<span class="tok-o">)</span>
-
 reconstruction_error_vector_level <span class="tok-o">=</span> get_reconstuction_error<span class="tok-o">(</span>output_original<span class="tok-o">,</span> output_pruned_vector_level<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Kernel-level 프루닝 적용 및 재구성 오차 계산</span>
-
 conv_pruned_kernel_level <span class="tok-o">=</span> nn<span class="tok-o">.</span>Conv2d<span class="tok-o">(</span><span class="tok-m">64</span><span class="tok-o">,</span> <span class="tok-m">128</span><span class="tok-o">,</span> kernel_size<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> padding<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">,</span> bias<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span> device<span class="tok-o">=</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
-
 conv_pruned_kernel_level<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">*</span> mask_kernel_level
-
 output_pruned_kernel_level <span class="tok-o">=</span> conv_pruned_kernel_level<span class="tok-o">(</span>input_sample<span class="tok-o">)</span>
-
 reconstruction_error_kernel_level <span class="tok-o">=</span> get_reconstuction_error<span class="tok-o">(</span>output_original<span class="tok-o">,</span> output_pruned_kernel_level<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Channel-level 프루닝 적용 및 재구성 오차 계산</span>
-
 conv_pruned_channel_level <span class="tok-o">=</span> nn<span class="tok-o">.</span>Conv2d<span class="tok-o">(</span><span class="tok-m">64</span><span class="tok-o">,</span> <span class="tok-m">128</span><span class="tok-o">,</span> kernel_size<span class="tok-o">=</span><span class="tok-m">3</span><span class="tok-o">,</span> padding<span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-o">,</span> bias<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span> device<span class="tok-o">=</span>weight<span class="tok-o">.</span>device<span class="tok-o">)</span>
-
 conv_pruned_channel_level<span class="tok-o">.</span>weight<span class="tok-o">.</span>data <span class="tok-o">=</span> weight<span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">*</span> mask_channel_level
-
 output_pruned_channel_level <span class="tok-o">=</span> conv_pruned_channel_level<span class="tok-o">(</span>input_sample<span class="tok-o">)</span>
-
 reconstruction_error_channel_level <span class="tok-o">=</span> get_reconstuction_error<span class="tok-o">(</span>output_original<span class="tok-o">,</span> output_pruned_channel_level<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Reconstruction error 시각화</span>
-
 plt<span class="tok-o">.</span>figure<span class="tok-o">(</span>figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">8</span><span class="tok-o">,</span> <span class="tok-m">6</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>bar<span class="tok-o">(</span><span class="tok-o">[</span><span class="tok-s">&#x27;Fine-grained&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;Vector-level&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;Kernel-level&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;Channel-level&#x27;</span><span class="tok-o">]</span><span class="tok-o">,</span>
-
         <span class="tok-o">[</span>reconstruction_error_fine_grained<span class="tok-o">,</span> reconstruction_error_vector_level<span class="tok-o">,</span>
-
          reconstruction_error_kernel_level<span class="tok-o">,</span> reconstruction_error_channel_level<span class="tok-o">]</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;Reconstruction Error&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>title<span class="tok-o">(</span><span class="tok-s">&#x27;Reconstruction Error of Different Pruning Methods&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="40"><h1>1.2. Pruning Ratio</h1></section><section class="nb-cell nb-markdown" data-cell="41"><ul><li>Layer별 민감도(Sensitivity) 분석</li><li>각 레이어의 중요도를 파악하기 위해 특정 레이어만 sparsity를 변화시키면서 정확도 변화를 측정</li><li>이를 통해 pruning에 민감한 레이어와 덜 민감한 레이어를 파악</li></ul>
 <ul><li>Non-uniform vs Uniform Pruning 비교</li><li>Uniform: 모든 레이어에 동일한 pruning ratio 적용</li><li>Non-uniform: 레이어별 민감도에 따라 global threshold 기반으로 다른 pruning ratio 적용</li><li>두 방식 간의 정확도와 모델 크기의 trade-off 비교 분석</li></ul></section><section class="nb-cell nb-markdown" data-cell="42"><h2>Sensitivity 분석</h2>
 <p>각 레이어의 민감도를 분석하기 위해 다른 레이어는 고정한 상태에서 특정 레이어의 sparsity를 변화시키며 정확도 변화를 측정합니다. 이를 통해 각 레이어가 pruning에 얼마나 민감한지 파악할 수 있습니다.</p></section><section class="nb-cell nb-code" data-cell="43"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
 <span class="tok-k">def</span> sensitivity_scan<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">,</span> scan_step<span class="tok-o">=</span><span class="tok-m">0.1</span><span class="tok-o">,</span> scan_start<span class="tok-o">=</span><span class="tok-m">0.4</span><span class="tok-o">,</span> scan_end<span class="tok-o">=</span><span class="tok-m">1.0</span><span class="tok-o">,</span> verbose<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     각 레이어의 민감도를 분석하기 위한 함수
 
@@ -843,177 +483,96 @@ plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-
         sparsities: 테스트한 sparsity 값들
         accuracies: 각 레이어별 sparsity에 따른 정확도
     &quot;&quot;&quot;</span>
-
     sparsities <span class="tok-o">=</span> np<span class="tok-o">.</span>arange<span class="tok-o">(</span>start<span class="tok-o">=</span>scan_start<span class="tok-o">,</span> stop<span class="tok-o">=</span>scan_end<span class="tok-o">,</span> step<span class="tok-o">=</span>scan_step<span class="tok-o">)</span>
-
     accuracies <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
 
-
-
     <span class="tok-c"># 합성곱 레이어의 가중치만 선택</span>
-
-    named_conv_weights <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">(</span>name<span class="tok-o">,</span> param<span class="tok-o">)</span> <span class="tok-k">for</span> <span class="tok-o">(</span>name<span class="tok-o">,</span> param<span class="tok-o">)</span>
+    named_conv_weights <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">(</span>name<span class="tok-o">,</span> param<span class="tok-o">)</span> <span class="tok-k">for</span> <span class="tok-o">(</span>name<span class="tok-o">,</span> param<span class="tok-o">)</span> \
                          <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-k">if</span> param<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">]</span>
 
-
-
     <span class="tok-c"># 각 레이어별로 민감도 스캔 수행</span>
-
     <span class="tok-k">for</span> i_layer<span class="tok-o">,</span> <span class="tok-o">(</span>name<span class="tok-o">,</span> param<span class="tok-o">)</span> <span class="tok-k">in</span> <span class="tok-b">enumerate</span><span class="tok-o">(</span>named_conv_weights<span class="tok-o">)</span><span class="tok-o">:</span>
-
         param_clone <span class="tok-o">=</span> param<span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">.</span>clone<span class="tok-o">(</span><span class="tok-o">)</span>  <span class="tok-c"># 원본 가중치 백업</span>
-
         accuracy <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
 
-
-
         <span class="tok-c"># 각 sparsity 레벨에서 pruning 수행하고 정확도 측정</span>
-
         <span class="tok-k">for</span> sparsity <span class="tok-k">in</span> tqdm<span class="tok-o">(</span>sparsities<span class="tok-o">,</span> desc<span class="tok-o">=</span>f&#x27;scanning <span class="tok-o">{</span>i_layer<span class="tok-o">}</span>/<span class="tok-o">{</span><span class="tok-b">len</span><span class="tok-o">(</span>named_conv_weights<span class="tok-o">)</span><span class="tok-o">}</span> weight - <span class="tok-o">{</span>name<span class="tok-o">}</span>&#x27;<span class="tok-o">)</span><span class="tok-o">:</span>
-
             prune_weight_fine_grained<span class="tok-o">(</span>param<span class="tok-o">.</span>detach<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> sparsity<span class="tok-o">=</span>sparsity<span class="tok-o">)</span>
-
             acc <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">,</span> verbose<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span>
 
-
-
             <span class="tok-k">if</span> verbose<span class="tok-o">:</span>
-
                 <span class="tok-b">print</span><span class="tok-o">(</span>f&#x27;\r    sparsity=<span class="tok-o">{</span>sparsity<span class="tok-o">:</span>.2f<span class="tok-o">}</span>: accuracy=<span class="tok-o">{</span>acc<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&#x27;<span class="tok-o">,</span> end<span class="tok-o">=</span><span class="tok-s">&#x27;&#x27;</span><span class="tok-o">)</span>
-
             <span class="tok-c"># restore</span>
-
             param<span class="tok-o">.</span>copy_<span class="tok-o">(</span>param_clone<span class="tok-o">)</span>
-
             accuracy<span class="tok-o">.</span>append<span class="tok-o">(</span>acc<span class="tok-o">)</span>
-
         <span class="tok-k">if</span> verbose<span class="tok-o">:</span>
-
-            <span class="tok-b">print</span><span class="tok-o">(</span>f&#x27;\r    sparsity=[<span class="tok-o">{</span><span class="tok-s">&quot;,&quot;</span><span class="tok-o">.</span>join<span class="tok-o">(</span><span class="tok-o">[</span><span class="tok-s">&quot;{:.2f}&quot;</span><span class="tok-o">.</span>format<span class="tok-o">(</span>x<span class="tok-o">)</span> <span class="tok-k">for</span> x <span class="tok-k">in</span> sparsities<span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">}</span>]: &#x27; <span class="tok-o">+</span>
+            <span class="tok-b">print</span><span class="tok-o">(</span>f&#x27;\r    sparsity=[<span class="tok-o">{</span><span class="tok-s">&quot;,&quot;</span><span class="tok-o">.</span>join<span class="tok-o">(</span><span class="tok-o">[</span><span class="tok-s">&quot;{:.2f}&quot;</span><span class="tok-o">.</span>format<span class="tok-o">(</span>x<span class="tok-o">)</span> <span class="tok-k">for</span> x <span class="tok-k">in</span> sparsities<span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">}</span>]: &#x27; <span class="tok-o">+</span> \
                   f&#x27;accuracy=[<span class="tok-o">{</span><span class="tok-s">&quot;, &quot;</span><span class="tok-o">.</span>join<span class="tok-o">(</span><span class="tok-o">[</span><span class="tok-s">&quot;{:.2f}%&quot;</span><span class="tok-o">.</span>format<span class="tok-o">(</span>x<span class="tok-o">)</span> <span class="tok-k">for</span> x <span class="tok-k">in</span> accuracy<span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">}</span>]&#x27;<span class="tok-o">,</span> end<span class="tok-o">=</span><span class="tok-s">&#x27;&#x27;</span><span class="tok-o">)</span>
-
-
 
         accuracies<span class="tok-o">.</span>append<span class="tok-o">(</span>accuracy<span class="tok-o">)</span>
 
-
-
     <span class="tok-k">return</span> sparsities<span class="tok-o">,</span> accuracies
 
-
-
 <span class="tok-c"># 민감도 분석 실행</span>
-
 sparsities<span class="tok-o">,</span> accuracies <span class="tok-o">=</span> sensitivity_scan<span class="tok-o">(</span>
-
     model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">,</span> scan_step<span class="tok-o">=</span><span class="tok-m">0.1</span><span class="tok-o">,</span> scan_start<span class="tok-o">=</span><span class="tok-m">0.4</span><span class="tok-o">,</span> scan_end<span class="tok-o">=</span><span class="tok-m">1.0</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="44"><p>각 레이어별 sparsity 변화에 따른 정확도를 시각화하여 sensitivity를 분석합니다. 아래 그래프는 각 레이어의 sparsity 변화에 따른 정확도 변화를 보여주며, 이를 통해 각 레이어의 pruning 민감도를 파악할 수 있습니다.</p></section><section class="nb-cell nb-code" data-cell="45"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> plot_sensitivity_scan<span class="tok-o">(</span>sparsities<span class="tok-o">,</span> accuracies<span class="tok-o">,</span> dense_model_accuracy<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;민감도 스캔 결과를 시각화하는 함수&quot;&quot;&quot;</span>
-
     lower_bound_accuracy <span class="tok-o">=</span> dense_model_accuracy <span class="tok-o">*</span> <span class="tok-m">0.96</span>  <span class="tok-c"># 기준 정확도의 96%를 하한선으로 설정</span>
 
-
-
     <span class="tok-c"># 서브플롯 생성</span>
-
     fig<span class="tok-o">,</span> axes <span class="tok-o">=</span> plt<span class="tok-o">.</span>subplots<span class="tok-o">(</span><span class="tok-m">3</span><span class="tok-o">,</span> <span class="tok-b">int</span><span class="tok-o">(</span>math<span class="tok-o">.</span>ceil<span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>accuracies<span class="tok-o">)</span> <span class="tok-o">/</span> <span class="tok-m">3</span><span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">,</span> figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">15</span><span class="tok-o">,</span> <span class="tok-m">8</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
     axes <span class="tok-o">=</span> axes<span class="tok-o">.</span>ravel<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 각 레이어별 민감도 곡선 그리기</span>
-
     plot_index <span class="tok-o">=</span> <span class="tok-m">0</span>
-
     <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-k">if</span> param<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">:</span>  <span class="tok-c"># Convolution/Linear 레이어만 선택</span>
-
             ax <span class="tok-o">=</span> axes<span class="tok-o">[</span>plot_index<span class="tok-o">]</span>
 
-
-
             <span class="tok-c"># 민감도 곡선과 하한선 그리기</span>
-
             ax<span class="tok-o">.</span>plot<span class="tok-o">(</span>sparsities<span class="tok-o">,</span> accuracies<span class="tok-o">[</span>plot_index<span class="tok-o">]</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&#x27;accuracy after pruning&#x27;</span><span class="tok-o">)</span>
-
             ax<span class="tok-o">.</span>plot<span class="tok-o">(</span>sparsities<span class="tok-o">,</span> <span class="tok-o">[</span>lower_bound_accuracy<span class="tok-o">]</span> <span class="tok-o">*</span> <span class="tok-b">len</span><span class="tok-o">(</span>sparsities<span class="tok-o">)</span><span class="tok-o">,</span>
-
                    label<span class="tok-o">=</span>f&#x27;<span class="tok-o">{</span>lower_bound_accuracy<span class="tok-o">/</span>dense_model_accuracy<span class="tok-o">*</span><span class="tok-m">100</span><span class="tok-o">:</span>.0f<span class="tok-o">}</span>% of dense model accuracy&#x27;<span class="tok-o">)</span>
 
-
-
             <span class="tok-c"># 축과 레이블 설정</span>
-
             ax<span class="tok-o">.</span>set_xticks<span class="tok-o">(</span>np<span class="tok-o">.</span>arange<span class="tok-o">(</span><span class="tok-m">0.4</span><span class="tok-o">,</span> <span class="tok-m">1.0</span><span class="tok-o">,</span> <span class="tok-m">0.1</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
             ax<span class="tok-o">.</span>set_ylim<span class="tok-o">(</span><span class="tok-m">80</span><span class="tok-o">,</span> <span class="tok-m">95</span><span class="tok-o">)</span>
-
             ax<span class="tok-o">.</span>set_title<span class="tok-o">(</span>name<span class="tok-o">)</span>
-
             ax<span class="tok-o">.</span>set_xlabel<span class="tok-o">(</span><span class="tok-s">&#x27;Sparsity&#x27;</span><span class="tok-o">)</span>
-
             ax<span class="tok-o">.</span>set_ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;Top-1 accuracy&#x27;</span><span class="tok-o">)</span>
-
             ax<span class="tok-o">.</span>legend<span class="tok-o">(</span><span class="tok-o">)</span>
-
             ax<span class="tok-o">.</span>grid<span class="tok-o">(</span>axis<span class="tok-o">=</span><span class="tok-s">&#x27;x&#x27;</span><span class="tok-o">)</span>
 
-
-
             plot_index <span class="tok-o">+=</span> <span class="tok-m">1</span>
-
     fig<span class="tok-o">.</span>suptitle<span class="tok-o">(</span><span class="tok-s">&#x27;Sensitivity Curves: Validation Accuracy vs. Pruning Sparsity&#x27;</span><span class="tok-o">)</span>
-
     fig<span class="tok-o">.</span>tight_layout<span class="tok-o">(</span><span class="tok-o">)</span>
-
     fig<span class="tok-o">.</span>subplots_adjust<span class="tok-o">(</span>top<span class="tok-o">=</span><span class="tok-m">0.925</span><span class="tok-o">)</span>
-
     plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span>
-
-
 
 plot_sensitivity_scan<span class="tok-o">(</span>sparsities<span class="tok-o">,</span> accuracies<span class="tok-o">,</span> dense_model_accuracy<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="46"><h2>[실습 2] Sensitivity Analysis를 통한 Pruning 수행</h2>
 <p>Sensitivity analysis 결과를 바탕으로 각 레이어별 sparsity를 <code>custom_sparsity_dict</code>에 입력하세요.</p>
 <p>위 그래프의 분석 결과를 토대로 아래와 같이 진행하면 됩니다다:</p>
 <ul><li>정확도 하락이 적은 레이어: 높은 sparsity 값 설정</li><li>정확도 하락이 큰 레이어: 낮은 sparsity 값 설정</li></ul>
 <p>이러한 레이어별 차등적인 pruning을 통해 모델의 전반적인 성능은 유지하면서 효율적인 압축을 달성하는 것이 목표입니다.</p></section><section class="nb-cell nb-code" data-cell="47"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">class</span> FineGrainedPruner<span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;Fine-grained pruning을 수행하는 클래스&quot;&quot;&quot;</span>
-
     <span class="tok-k">def</span> __init__<span class="tok-o">(</span>self<span class="tok-o">,</span> model<span class="tok-o">,</span> sparsity_dict<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;
         Args:
             model: pruning할 모델
             sparsity_dict: 레이어별 희소성 비율을 담은 딕셔너리
         &quot;&quot;&quot;</span>
-
         self<span class="tok-o">.</span>masks <span class="tok-o">=</span> FineGrainedPruner<span class="tok-o">.</span>prune<span class="tok-o">(</span>model<span class="tok-o">,</span> sparsity_dict<span class="tok-o">)</span>
 
-
-
     <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
     <span class="tok-k">def</span> apply<span class="tok-o">(</span>self<span class="tok-o">,</span> model<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;마스크를 모델에 적용&quot;&quot;&quot;</span>
-
         <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-k">if</span> name <span class="tok-k">in</span> self<span class="tok-o">.</span>masks<span class="tok-o">:</span>
-
                 param <span class="tok-o">*=</span> self<span class="tok-o">.</span>masks<span class="tok-o">[</span>name<span class="tok-o">]</span>
 
-
-
     <span class="tok-o">@</span>staticmethod
-
     <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
     <span class="tok-k">def</span> prune<span class="tok-o">(</span>model<span class="tok-o">,</span> sparsity_dict<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;
         모델의 각 레이어에 대해 희소성 비율에 따라 가지치기 수행
 
@@ -1024,21 +583,13 @@ plot_sensitivity_scan<span class="tok-o">(</span>sparsities<span class="tok-o">,
         Returns:
             masks: 레이어별 마스크를 담은 딕셔너리
         &quot;&quot;&quot;</span>
-
         masks <span class="tok-o">=</span> <span class="tok-b">dict</span><span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-k">if</span> param<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">:</span> <span class="tok-c"># we only prune conv and fc weights</span>
-
                 masks<span class="tok-o">[</span>name<span class="tok-o">]</span> <span class="tok-o">=</span> prune_weight_fine_grained<span class="tok-o">(</span>param<span class="tok-o">,</span> sparsity_dict<span class="tok-o">[</span>name<span class="tok-o">]</span><span class="tok-o">)</span>
-
         <span class="tok-k">return</span> masks
 
-
-
 <span class="tok-k">def</span> get_uniform_sparsity_dict<span class="tok-o">(</span>sparsity<span class="tok-o">)</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     모든 레이어에 동일한 희소성 비율을 적용하는 딕셔너리 생성
 
@@ -1048,12 +599,8 @@ plot_sensitivity_scan<span class="tok-o">(</span>sparsities<span class="tok-o">,
     Returns:
         sparsity_dict: 레이어별 동일한 희소성 비율을 담은 딕셔너리
     &quot;&quot;&quot;</span>
-
     sparsity_dict <span class="tok-o">=</span> <span class="tok-o">{</span>name<span class="tok-o">:</span> sparsity <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-k">if</span> param<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">}</span>
-
-    <span class="tok-k">return</span> sparsity_dict
-</code></pre></section><section class="nb-cell nb-code" data-cell="48"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> get_model_sparsity<span class="tok-o">(</span>model<span class="tok-o">:</span> nn<span class="tok-o">.</span>Module<span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-b">float</span><span class="tok-o">:</span>
-
+    <span class="tok-k">return</span> sparsity_dict</code></pre></section><section class="nb-cell nb-code" data-cell="48"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> get_model_sparsity<span class="tok-o">(</span>model<span class="tok-o">:</span> nn<span class="tok-o">.</span>Module<span class="tok-o">)</span> <span class="tok-o">-&gt;</span> <span class="tok-b">float</span><span class="tok-o">:</span>
     <span class="tok-s">&quot;&quot;&quot;
     모델 전체의 sparsity 계산.
 
@@ -1063,125 +610,67 @@ plot_sensitivity_scan<span class="tok-o">(</span>sparsities<span class="tok-o">,
     Returns:
         float: 모델의 전체 스파시티 비율 (0~1 사이 값)
     &quot;&quot;&quot;</span>
-
     num_nonzeros<span class="tok-o">,</span> num_elements <span class="tok-o">=</span> <span class="tok-m">0</span><span class="tok-o">,</span> <span class="tok-m">0</span>
-
     <span class="tok-k">for</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         num_nonzeros <span class="tok-o">+=</span> param<span class="tok-o">.</span>count_nonzero<span class="tok-o">(</span><span class="tok-o">)</span>
-
         num_elements <span class="tok-o">+=</span> param<span class="tok-o">.</span>numel<span class="tok-o">(</span><span class="tok-o">)</span>
-
     <span class="tok-k">return</span> <span class="tok-m">1</span> <span class="tok-o">-</span> <span class="tok-b">float</span><span class="tok-o">(</span>num_nonzeros<span class="tok-o">)</span> <span class="tok-o">/</span> num_elements
 
-
-
 custom_sparsity_dict <span class="tok-o">=</span> <span class="tok-o">{</span>
-
 <span class="tok-c">##################### YOUR CODE STARTS HERE #####################</span>
-
     <span class="tok-c"># Key는 수정하지 마시고, 각 layer의 sparsity 값을 조정하세요.</span>
-
     <span class="tok-s">&#x27;backbone.conv0.weight&#x27;</span><span class="tok-o">:</span> <span class="tok-o">,</span>
-
     <span class="tok-s">&#x27;backbone.conv1.weight&#x27;</span><span class="tok-o">:</span> <span class="tok-o">,</span>
-
     <span class="tok-s">&#x27;backbone.conv2.weight&#x27;</span><span class="tok-o">:</span> <span class="tok-o">,</span>
-
     <span class="tok-s">&#x27;backbone.conv3.weight&#x27;</span><span class="tok-o">:</span> <span class="tok-o">,</span>
-
     <span class="tok-s">&#x27;backbone.conv4.weight&#x27;</span><span class="tok-o">:</span> <span class="tok-o">,</span>
-
     <span class="tok-s">&#x27;backbone.conv5.weight&#x27;</span><span class="tok-o">:</span> <span class="tok-o">,</span>
-
     <span class="tok-s">&#x27;backbone.conv6.weight&#x27;</span><span class="tok-o">:</span> <span class="tok-o">,</span>
-
     <span class="tok-s">&#x27;backbone.conv7.weight&#x27;</span><span class="tok-o">:</span> <span class="tok-o">,</span>
-
     <span class="tok-s">&#x27;classifier.weight&#x27;</span><span class="tok-o">:</span>
-
 <span class="tok-c">##################### YOUR CODE ENDS HERE #######################</span>
-
 <span class="tok-o">}</span>
 
-
-
 <span class="tok-c"># 프루닝 적용 및 평가</span>
-
 pruner <span class="tok-o">=</span> FineGrainedPruner<span class="tok-o">(</span>model<span class="tok-o">,</span> custom_sparsity_dict<span class="tok-o">)</span>
-
 pruner<span class="tok-o">.</span>apply<span class="tok-o">(</span>model<span class="tok-o">)</span>
-
 custom_pruned_model_accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
 custom_sparsity <span class="tok-o">=</span> get_model_sparsity<span class="tok-o">(</span>model<span class="tok-o">)</span>
-
 model<span class="tok-o">.</span>recover_model<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 결과 출력</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;custom_pruned_model has accuracy=<span class="tok-o">{</span>custom_pruned_model_accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Model sparsity: <span class="tok-o">{</span>custom_sparsity<span class="tok-o">:</span>.3f<span class="tok-o">}</span>&quot;<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="49"><p>Sensitivity analysis를 통한 pruning 결과와 비교하기 위해 모든 레이어에 uniform sparsity를 적용했을 때의 accuracy를 측정합니다.</p></section><section class="nb-cell nb-code" data-cell="50"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># 균일한 sparsity 값들을 생성 (0.4부터 0.9까지 0.1 간격)</span>
-
 uniform_sparsities <span class="tok-o">=</span> np<span class="tok-o">.</span>arange<span class="tok-o">(</span>start<span class="tok-o">=</span><span class="tok-m">0.4</span><span class="tok-o">,</span> stop<span class="tok-o">=</span><span class="tok-m">1.0</span><span class="tok-o">,</span> step<span class="tok-o">=</span><span class="tok-m">0.1</span><span class="tok-o">)</span>
-
 accuracies <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
 
-
-
 <span class="tok-c"># 각 sparsity 값에 대해 프루닝 수행 및 정확도 측정</span>
-
 <span class="tok-k">for</span> sparsity <span class="tok-k">in</span> uniform_sparsities<span class="tok-o">:</span>
-
     <span class="tok-c"># 균일한 sparsity로 프루너 생성 및 적용</span>
-
     pruner <span class="tok-o">=</span> FineGrainedPruner<span class="tok-o">(</span>model<span class="tok-o">,</span> get_uniform_sparsity_dict<span class="tok-o">(</span>sparsity<span class="tok-o">)</span><span class="tok-o">)</span>
-
     pruner<span class="tok-o">.</span>apply<span class="tok-o">(</span>model<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 테스트셋에서 정확도 평가</span>
-
     accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">,</span> verbose<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span>
-
     accuracies<span class="tok-o">.</span>append<span class="tok-o">(</span>accuracy<span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 모델 복구</span>
-
     model<span class="tok-o">.</span>recover_model<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
     <span class="tok-c"># 결과 출력</span>
-
-    <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;uniform sparsity=<span class="tok-o">{</span>sparsity<span class="tok-o">:</span>.2f<span class="tok-o">}</span>: accuracy=<span class="tok-o">{</span>accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-markdown" data-cell="51"><p>Layer-wise pruning(uniform sparsity)와 global pruning(sensitivity analysis) 방식의 정확도를 비교하는 그래프입니다.</p></section><section class="nb-cell nb-code" data-cell="52"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>uniform_sparsities<span class="tok-o">,</span> accuracies<span class="tok-o">,</span> <span class="tok-s">&#x27;o-&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&quot;Layer-wise Pruning&quot;</span><span class="tok-o">)</span>
-
+    <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;uniform sparsity=<span class="tok-o">{</span>sparsity<span class="tok-o">:</span>.2f<span class="tok-o">}</span>: accuracy=<span class="tok-o">{</span>accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="51"><p>Layer-wise pruning(uniform sparsity)와 global pruning(sensitivity analysis) 방식의 정확도를 비교하는 그래프입니다.</p></section><section class="nb-cell nb-code" data-cell="52"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>uniform_sparsities<span class="tok-o">,</span> accuracies<span class="tok-o">,</span> <span class="tok-s">&#x27;o-&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&quot;Layer-wise Pruning&quot;</span><span class="tok-o">)</span>
 plt<span class="tok-o">.</span>plot<span class="tok-o">(</span><span class="tok-o">[</span>custom_sparsity<span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-o">[</span>custom_pruned_model_accuracy<span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-s">&#x27;ro&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&#x27;Global Pruning (w/ sensitivity)&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>xlabel<span class="tok-o">(</span><span class="tok-s">&#x27;Sparsity&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;Top-1 Accuracy&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>title<span class="tok-o">(</span><span class="tok-s">&#x27;Accuracy vs. Sparsity&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>legend<span class="tok-o">(</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="53"><h2>[실습 3] Global Magnitude Pruning 구현</h2>
 <p>이 실습에서는 Global Magnitude Pruning을 구현합니다. Global Magnitude Pruning은 모델의 모든 가중치를 하나의 집합으로 간주하고, 가중치의 절대값을 기준으로 중요도를 평가하여 전체 모델에서 가장 작은 가중치를 제거하는 방식입니다. 이는 각 레이어별로 균일한 비율로 프루닝하는 것이 아니라, 전체 모델에서 가중치의 크기에 따라 프루닝을 수행합니다.</p>
 <p><strong>구현 과정:</strong></p>
 <ul><li>모든 레이어의 가중치를 하나의 벡터로 통합</li><li>가중치의 절대값으로 중요도 계산</li><li>프루닝 비율에 따른 임계값 설정</li><li>임계값 미만의 가중치를 제거하는 마스크 생성 및 적용</li></ul>
 <p>이러한 방식으로 모델의 파라미터를 효율적으로 줄이면서도 중요한 정보는 보존할 수 있습니다. 결과적으로 모델 크기와 연산량을 감소시키면서 성능 저하를 최소화하는 것이 목표입니다.</p>
 <p>아래 빈칸을 채워 <code>FineGrainedPrunerV2</code> 클래스를 완성하세요.</p></section><section class="nb-cell nb-code" data-cell="54"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">class</span> FineGrainedPrunerV2<span class="tok-o">:</span>
-
     <span class="tok-k">def</span> __init__<span class="tok-o">(</span>self<span class="tok-o">,</span> model<span class="tok-o">,</span> sparsity<span class="tok-o">,</span> global_prune<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;
         전역 또는 레이어별 프루닝을 위한 프루너 클래스
 
@@ -1190,31 +679,18 @@ plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-
             sparsity: 프루닝 비율 (0~1)
             global_prune: 전역 프루닝 여부
         &quot;&quot;&quot;</span>
-
         self<span class="tok-o">.</span>masks <span class="tok-o">=</span> FineGrainedPrunerV2<span class="tok-o">.</span>prune<span class="tok-o">(</span>model<span class="tok-o">,</span> sparsity<span class="tok-o">,</span> global_prune<span class="tok-o">)</span>
 
-
-
     <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
     <span class="tok-k">def</span> apply<span class="tok-o">(</span>self<span class="tok-o">,</span> model<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;프루닝 마스크를 모델에 적용&quot;&quot;&quot;</span>
-
         <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
             <span class="tok-k">if</span> name <span class="tok-k">in</span> self<span class="tok-o">.</span>masks<span class="tok-o">:</span>
-
                 param <span class="tok-o">*=</span> self<span class="tok-o">.</span>masks<span class="tok-o">[</span>name<span class="tok-o">]</span>
 
-
-
     <span class="tok-o">@</span>staticmethod
-
     <span class="tok-o">@</span>torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span>
-
     <span class="tok-k">def</span> prune<span class="tok-o">(</span>model<span class="tok-o">,</span> sparsity<span class="tok-o">,</span> global_prune<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-s">&quot;&quot;&quot;
         전역 또는 레이어별 프루닝 수행
 
@@ -1226,133 +702,68 @@ plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-
         Returns:
             masks: 프루닝 마스크 딕셔너리
         &quot;&quot;&quot;</span>
-
         masks <span class="tok-o">=</span> <span class="tok-b">dict</span><span class="tok-o">(</span><span class="tok-o">)</span>
-
         <span class="tok-k">if</span> global_prune<span class="tok-o">:</span>
-
             <span class="tok-c"># 모든 2D 이상의 파라미터를 1차원으로 변환하여 수집</span>
-
             parameters_to_prune <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
-
             <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
                 <span class="tok-k">if</span> param<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">:</span>  <span class="tok-c"># conv, fc 레이어만 프루닝</span>
-
                     parameters_to_prune<span class="tok-o">.</span>append<span class="tok-o">(</span>param<span class="tok-o">.</span>view<span class="tok-o">(</span><span class="tok-o">-</span><span class="tok-m">1</span><span class="tok-o">)</span><span class="tok-o">)</span>
 
-
-
             <span class="tok-c">##################### YOUR CODE STARTS HERE #####################</span>
-
             <span class="tok-c"># 모든 weight를 하나의 텐서로 결합해주세요..</span>
-
             <span class="tok-c"># hint: torch.cat()을 사용하세요.</span>
-
             all_weights <span class="tok-o">=</span>
 
-
-
             <span class="tok-c"># all_weights를 대상으로 global threshold를 구해주세요.</span>
-
             num_elements <span class="tok-o">=</span>
-
             num_zeros <span class="tok-o">=</span>
-
             importance <span class="tok-o">=</span>
-
             threshold <span class="tok-o">=</span>
-
             <span class="tok-c">##################### YOUR CODE ENDS HERE #######################</span>
 
-
-
             <span class="tok-c"># threshold 기반 마스크 생성</span>
-
             <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
                 <span class="tok-k">if</span> param<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">:</span>
-
                     mask <span class="tok-o">=</span> torch<span class="tok-o">.</span><span class="tok-b">abs</span><span class="tok-o">(</span>param<span class="tok-o">.</span>data<span class="tok-o">)</span> <span class="tok-o">&gt;</span> threshold
-
                     masks<span class="tok-o">[</span>name<span class="tok-o">]</span> <span class="tok-o">=</span> mask
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             <span class="tok-c"># 레이어별 프루닝 수행</span>
-
             <span class="tok-k">for</span> name<span class="tok-o">,</span> param <span class="tok-k">in</span> model<span class="tok-o">.</span>named_parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
-
                 <span class="tok-k">if</span> param<span class="tok-o">.</span>dim<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">:</span> <span class="tok-c"># we only prune conv and fc weights</span>
-
                     masks<span class="tok-o">[</span>name<span class="tok-o">]</span> <span class="tok-o">=</span> prune_weight_fine_grained<span class="tok-o">(</span>param<span class="tok-o">,</span> sparsity<span class="tok-o">)</span>
-
-        <span class="tok-k">return</span> masks
-</code></pre></section><section class="nb-cell nb-code" data-cell="55"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># Golbal Magnitude Pruning 수행</span>
-
+        <span class="tok-k">return</span> masks</code></pre></section><section class="nb-cell nb-code" data-cell="55"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># Golbal Magnitude Pruning 수행</span>
 pruner <span class="tok-o">=</span> FineGrainedPrunerV2<span class="tok-o">(</span>model<span class="tok-o">,</span> custom_sparsity<span class="tok-o">,</span> global_prune<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
 pruner<span class="tok-o">.</span>apply<span class="tok-o">(</span>model<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 프루닝된 모델의 정확도 평가</span>
-
 global_magnitude_pruned_model_accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 모델 복구</span>
-
 model<span class="tok-o">.</span>recover_model<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># 결과 출력</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;global_magnitude_pruned_model has accuracy=<span class="tok-o">{</span>global_magnitude_pruned_model_accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="56"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>uniform_sparsities<span class="tok-o">,</span> accuracies<span class="tok-o">,</span> <span class="tok-s">&#x27;o-&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&quot;Layer-wise Pruning&quot;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>plot<span class="tok-o">(</span><span class="tok-o">[</span>custom_sparsity<span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-o">[</span>custom_pruned_model_accuracy<span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-s">&#x27;ro&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&#x27;Global Pruning (w/ sensitivity)&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>plot<span class="tok-o">(</span><span class="tok-o">[</span>custom_sparsity<span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-o">[</span>global_magnitude_pruned_model_accuracy<span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-s">&#x27;go&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&#x27;Global Magnitude Pruning&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>xlabel<span class="tok-o">(</span><span class="tok-s">&#x27;Sparsity&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;Top-1 Accuracy&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>title<span class="tok-o">(</span><span class="tok-s">&#x27;Accuracy vs. Sparsity&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>legend<span class="tok-o">(</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="57"><p>Global magnitude pruning 방식으로 pruning한 모델의 정확도를 다른 pruning 방식과 비교 분석합니다. Layer-wise pruning, Global pruning (sensitivity 기반), Global magnitude pruning 세 방식의 성능을 비교하여 각 방식의 특징을 비교합니다.</p></section><section class="nb-cell nb-code" data-cell="58"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">global_magnitude_pruned_model_accuracies <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
-
 <span class="tok-k">for</span> sparsity <span class="tok-k">in</span> uniform_sparsities<span class="tok-o">:</span>
-
     pruner <span class="tok-o">=</span> FineGrainedPrunerV2<span class="tok-o">(</span>model<span class="tok-o">,</span> sparsity<span class="tok-o">,</span> global_prune<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
     pruner<span class="tok-o">.</span>apply<span class="tok-o">(</span>model<span class="tok-o">)</span>
-
     accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">,</span> verbose<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span>
-
     global_magnitude_pruned_model_accuracies<span class="tok-o">.</span>append<span class="tok-o">(</span>accuracy<span class="tok-o">)</span>
-
     model<span class="tok-o">.</span>recover_model<span class="tok-o">(</span><span class="tok-o">)</span>
-
-    <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;global magnitude sparsity=<span class="tok-o">{</span>sparsity<span class="tok-o">:</span>.2f<span class="tok-o">}</span>: accuracy=<span class="tok-o">{</span>accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span>
-</code></pre></section><section class="nb-cell nb-code" data-cell="59"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>uniform_sparsities<span class="tok-o">,</span> accuracies<span class="tok-o">,</span> <span class="tok-s">&#x27;o-&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&quot;Layer-wise Pruning&quot;</span><span class="tok-o">)</span>
-
+    <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;global magnitude sparsity=<span class="tok-o">{</span>sparsity<span class="tok-o">:</span>.2f<span class="tok-o">}</span>: accuracy=<span class="tok-o">{</span>accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="59"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>uniform_sparsities<span class="tok-o">,</span> accuracies<span class="tok-o">,</span> <span class="tok-s">&#x27;o-&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&quot;Layer-wise Pruning&quot;</span><span class="tok-o">)</span>
 plt<span class="tok-o">.</span>plot<span class="tok-o">(</span><span class="tok-o">[</span>custom_sparsity<span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-o">[</span>custom_pruned_model_accuracy<span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-s">&#x27;ro&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&#x27;Global Pruning (w/ sensitivity)&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>plot<span class="tok-o">(</span>uniform_sparsities<span class="tok-o">,</span> global_magnitude_pruned_model_accuracies<span class="tok-o">,</span> <span class="tok-s">&#x27;go-&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&#x27;Global Magnitude Pruning&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>xlabel<span class="tok-o">(</span><span class="tok-s">&#x27;Sparsity&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;Top-1 Accuracy&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>title<span class="tok-o">(</span><span class="tok-s">&#x27;Accuracy vs. Sparsity&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>legend<span class="tok-o">(</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="60"><h1>1.3. Pruning Schedule</h1></section><section class="nb-cell nb-markdown" data-cell="61"><p>이 섹션에서는 Pruning 스케줄링을 구현하고, 모델의 Fine-tuning과 함께 Pruning을 진행합니다. Pruning 스케줄링은 모델 학습 중 특정 시점에 가중치를 제거하는 체계적인 접근 방식입니다. 이를 통해 모델의 학습 과정에서 점진적으로 Pruning을 적용하여 성능 저하를 최소화하면서 모델 크기를 효과적으로 줄일 수 있습니다.</p>
 <p><strong>주요 Pruning 스케줄 방식:</strong></p>
 <ul><li><strong>One-shot Pruning</strong>: 목표 Pruning 비율을 한 번에 적용한 후, Fine-tuning으로 성능을 회복합니다.</li><li><strong>Iterative Pruning</strong>: 여러 단계에 걸쳐 점진적으로 Pruning을 수행합니다. 각 단계마다 일정 비율의 가중치를 제거하고 학습을 통해 모델이 새로운 구조에 적응하도록 합니다.</li></ul>
@@ -1362,50 +773,29 @@ plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-
 <p>실습 3에서 구현한 <code>FineGrainedPrunerV2</code>를 사용하여 One-shot Pruning을 구현합니다. 목표 sparsity를 95%로 설정하고 5 epoch 동안 fine-tuning을 진행합니다.</p>
 <p>학습에 사용되는 주요 구성 요소:</p>
 <ul><li>Optimizer: SGD (learning rate=0.01, momentum=0.9, weight_decay=1e-4)</li><li>Scheduler: CosineAnnealingLR</li><li>Loss function: CrossEntropyLoss</li></ul></section><section class="nb-cell nb-code" data-cell="63"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">num_finetune_epochs <span class="tok-o">=</span> <span class="tok-m">5</span>
-
 target_sparsity <span class="tok-o">=</span> <span class="tok-m">0.95</span>
-
 optimizer <span class="tok-o">=</span> torch<span class="tok-o">.</span>optim<span class="tok-o">.</span>SGD<span class="tok-o">(</span>model<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> lr<span class="tok-o">=</span><span class="tok-m">0.01</span><span class="tok-o">,</span> momentum<span class="tok-o">=</span><span class="tok-m">0.9</span><span class="tok-o">,</span> weight_decay<span class="tok-o">=</span><span class="tok-m">1e-4</span><span class="tok-o">)</span>
-
 scheduler <span class="tok-o">=</span> torch<span class="tok-o">.</span>optim<span class="tok-o">.</span>lr_scheduler<span class="tok-o">.</span>CosineAnnealingLR<span class="tok-o">(</span>optimizer<span class="tok-o">,</span> num_finetune_epochs <span class="tok-o">*</span> <span class="tok-b">len</span><span class="tok-o">(</span>dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;train&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
 criterion <span class="tok-o">=</span> nn<span class="tok-o">.</span>CrossEntropyLoss<span class="tok-o">(</span><span class="tok-o">)</span>
-
-
 
 pruner <span class="tok-o">=</span> FineGrainedPrunerV2<span class="tok-o">(</span>model<span class="tok-o">,</span> target_sparsity<span class="tok-o">,</span> global_prune<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Finetuning Fine-grained Pruned Sparse Model&quot;<span class="tok-o">)</span>
-
 <span class="tok-k">for</span> epoch <span class="tok-k">in</span> <span class="tok-b">range</span><span class="tok-o">(</span>num_finetune_epochs<span class="tok-o">)</span><span class="tok-o">:</span>
-
     train<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;train&#x27;</span><span class="tok-o">]</span><span class="tok-o">,</span> criterion<span class="tok-o">,</span> optimizer<span class="tok-o">,</span> scheduler<span class="tok-o">,</span>
-
           callbacks<span class="tok-o">=</span><span class="tok-o">[</span><span class="tok-k">lambda</span><span class="tok-o">:</span> pruner<span class="tok-o">.</span>apply<span class="tok-o">(</span>model<span class="tok-o">)</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
     accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;   Epoch <span class="tok-o">{</span>epoch<span class="tok-o">+</span><span class="tok-m">1</span><span class="tok-o">}</span>/<span class="tok-o">{</span>num_finetune_epochs<span class="tok-o">}</span>: accuracy=<span class="tok-o">{</span>accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span>
-
 model<span class="tok-o">.</span>recover_model<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="64"><h2>[실습 4] Sparsity Scheduler 구현</h2>
 <p>이 실습에서는 시간에 따른 Pruning 비율을 조절하는 다음 2가지 Sparsity Scheduler를 구현합니다:</p>
 <ul><li><strong>Linear sparsity scheduler</strong>: $v^{(t)} = v_f + \left(v_i - v_f\right)\left(1 - \frac{t - t_i}{t_f - t_i}\right)$</li><li>시간에 따라 선형적으로 sparsity가 증가</li><li><strong>Cubic sparsity scheduler</strong>: $v^{(t)} = v_f + \left(v_i - v_f\right)\left(1 - \frac{t - t_i}{t_f - t_i}\right)^3$</li><li>시간에 따라 세제곱 비율로 sparsity가 증가</li></ul>
 <p>아래 빈 칸을 채워 <code>get_sparsity_schedule</code> 함수를 완성하세요.</p></section><section class="nb-cell nb-code" data-cell="65"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-k">def</span> get_sparsity_schedule<span class="tok-o">(</span>num_epochs<span class="tok-o">:</span> <span class="tok-b">int</span><span class="tok-o">,</span>
-
                           epoch_start<span class="tok-o">:</span> <span class="tok-b">int</span><span class="tok-o">,</span>
-
                           epoch_end<span class="tok-o">:</span> <span class="tok-b">int</span><span class="tok-o">,</span>
-
                           sparsity_start<span class="tok-o">:</span> <span class="tok-b">float</span><span class="tok-o">,</span>
-
                           sparsity_end<span class="tok-o">:</span> <span class="tok-b">float</span><span class="tok-o">,</span>
-
                           exponent<span class="tok-o">:</span> <span class="tok-b">int</span><span class="tok-o">,</span>
-
                           <span class="tok-o">)</span> <span class="tok-o">-&gt;</span> List<span class="tok-o">[</span><span class="tok-b">float</span><span class="tok-o">]</span><span class="tok-o">:</span>
-
     <span class="tok-s">&quot;&quot;&quot;
     스파시티 스케줄을 생성하는 함수입니다.
 
@@ -1420,116 +810,61 @@ model<span class="tok-o">.</span>recover_model<span class="tok-o">(</span><span 
     Returns:
         각 에폭별 스파시티 값 리스트
     &quot;&quot;&quot;</span>
-
     sparsity_schedule <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
-
     <span class="tok-c">##################### YOUR CODE STARTS HERE #####################</span>
-
     <span class="tok-k">for</span> epoch <span class="tok-k">in</span> <span class="tok-b">range</span><span class="tok-o">(</span>num_epochs<span class="tok-o">)</span><span class="tok-o">:</span>
-
         <span class="tok-c"># 위 수식에 맞게 sparsity를 계산하세요. (단, epoch_start보다 작은 경우 0으로 epochs_end 이후는 sparsity_end로 설정합니다.)</span>
-
         <span class="tok-k">if</span> epoch <span class="tok-o">&lt;</span> epoch_start<span class="tok-o">:</span>
-
             sparsity <span class="tok-o">=</span>
-
         <span class="tok-k">elif</span> epoch <span class="tok-o">&gt;=</span> epoch_end<span class="tok-o">:</span>
-
             sparsity <span class="tok-o">=</span>
-
         <span class="tok-k">else</span><span class="tok-o">:</span>
-
             sparsity <span class="tok-o">=</span>
-
-
 
         sparsity_schedule<span class="tok-o">.</span>append<span class="tok-o">(</span>sparsity<span class="tok-o">)</span>
-
     <span class="tok-c">##################### YOUR CODE ENDS HERE #######################</span>
-
     <span class="tok-k">return</span> sparsity_schedule
 
-
-
 <span class="tok-c"># Linear sparsity schedule</span>
-
 <span class="tok-c"># linear_sparsity_schedule = [0.9, 0.925, 0.95, 0.95, 0.95]</span>
-
 linear_sparsity_schedule <span class="tok-o">=</span> get_sparsity_schedule<span class="tok-o">(</span>num_finetune_epochs<span class="tok-o">,</span> <span class="tok-m">0</span><span class="tok-o">,</span> <span class="tok-m">2</span><span class="tok-o">,</span> <span class="tok-m">0.9</span><span class="tok-o">,</span> target_sparsity<span class="tok-o">,</span> <span class="tok-m">1</span><span class="tok-o">)</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Linear sparsity schedule:&quot;</span><span class="tok-o">,</span> linear_sparsity_schedule<span class="tok-o">)</span>
 
-
-
 <span class="tok-c"># Cubic sparsity schedule</span>
-
 <span class="tok-c"># cubic_sparsity_schedule = [0.9, 0.94375, 0.95, 0.95, 0.95]</span>
-
 cubic_sparsity_schedule <span class="tok-o">=</span> get_sparsity_schedule<span class="tok-o">(</span>num_finetune_epochs<span class="tok-o">,</span> <span class="tok-m">0</span><span class="tok-o">,</span> <span class="tok-m">2</span><span class="tok-o">,</span> <span class="tok-m">0.9</span><span class="tok-o">,</span> target_sparsity<span class="tok-o">,</span> <span class="tok-m">3</span><span class="tok-o">)</span>
-
 <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Cubic sparsity schedule:&quot;</span><span class="tok-o">,</span> cubic_sparsity_schedule<span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-code" data-cell="66"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">plt<span class="tok-o">.</span>plot<span class="tok-o">(</span><span class="tok-b">range</span><span class="tok-o">(</span>num_finetune_epochs<span class="tok-o">)</span><span class="tok-o">,</span> linear_sparsity_schedule<span class="tok-o">,</span> <span class="tok-s">&#x27;o-&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&#x27;Linear&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>plot<span class="tok-o">(</span><span class="tok-b">range</span><span class="tok-o">(</span>num_finetune_epochs<span class="tok-o">)</span><span class="tok-o">,</span> cubic_sparsity_schedule<span class="tok-o">,</span> <span class="tok-s">&#x27;o-&#x27;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&#x27;Cubic&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>xticks<span class="tok-o">(</span>np<span class="tok-o">.</span>arange<span class="tok-o">(</span><span class="tok-m">5</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>xlabel<span class="tok-o">(</span><span class="tok-s">&#x27;Epoch&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>ylabel<span class="tok-o">(</span><span class="tok-s">&#x27;Sparsity&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>title<span class="tok-o">(</span><span class="tok-s">&#x27;Sparsity Schedule&#x27;</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>legend<span class="tok-o">(</span><span class="tok-o">)</span>
-
 plt<span class="tok-o">.</span>show<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="67"><h2>Iterative Pruning</h2>
 <p>Iterative Pruning은 모델의 가중치를 한 번에 제거하는 대신 여러 단계에 걸쳐 점진적으로 제거하는 방법입니다. 각 단계에서 일정 비율의 가중치를 제거한 후 모델을 재학습시켜 남은 가중치들이 제거된 가중치를 보완할 수 있도록 합니다.</p>
 <p>이때 가중치를 제거하는 비율을 조절하는 방법으로 Linear와 Cubic Sparsity Scheduler를 사용할 수 있습니다. Cubic Scheduler는 초기에는 빠르게 가중치를 제거하다가 후반부로 갈수록 천천히 제거하는 방식을 사용합니다. 이는 모델이 후반에 중요한 가중치를 신중하게 제거할 수 있도록 시간을 더 많이 주기 때문에, Linear Scheduler에 비해 일반적으로 더 좋은 성능을 보입니다.</p></section><section class="nb-cell nb-markdown" data-cell="68"><p>Linear sparsity schedule을 사용하여 iterative pruning을 수행하세요.</p></section><section class="nb-cell nb-code" data-cell="69"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">optimizer <span class="tok-o">=</span> torch<span class="tok-o">.</span>optim<span class="tok-o">.</span>SGD<span class="tok-o">(</span>model<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> lr<span class="tok-o">=</span><span class="tok-m">0.01</span><span class="tok-o">,</span> momentum<span class="tok-o">=</span><span class="tok-m">0.9</span><span class="tok-o">,</span> weight_decay<span class="tok-o">=</span><span class="tok-m">1e-4</span><span class="tok-o">)</span>
-
 scheduler <span class="tok-o">=</span> torch<span class="tok-o">.</span>optim<span class="tok-o">.</span>lr_scheduler<span class="tok-o">.</span>CosineAnnealingLR<span class="tok-o">(</span>optimizer<span class="tok-o">,</span> num_finetune_epochs <span class="tok-o">*</span> <span class="tok-b">len</span><span class="tok-o">(</span>dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;train&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
 criterion <span class="tok-o">=</span> nn<span class="tok-o">.</span>CrossEntropyLoss<span class="tok-o">(</span><span class="tok-o">)</span>
-
-
 
 <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Finetuning Fine-grained Pruned Sparse Model with linear sparsity scheduler&quot;<span class="tok-o">)</span>
-
 <span class="tok-k">for</span> epoch <span class="tok-k">in</span> <span class="tok-b">range</span><span class="tok-o">(</span>num_finetune_epochs<span class="tok-o">)</span><span class="tok-o">:</span>
-
     pruner <span class="tok-o">=</span> FineGrainedPrunerV2<span class="tok-o">(</span>model<span class="tok-o">,</span> linear_sparsity_schedule<span class="tok-o">[</span>epoch<span class="tok-o">]</span><span class="tok-o">,</span> global_prune<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
     train<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;train&#x27;</span><span class="tok-o">]</span><span class="tok-o">,</span> criterion<span class="tok-o">,</span> optimizer<span class="tok-o">,</span> scheduler<span class="tok-o">,</span>
-
           callbacks<span class="tok-o">=</span><span class="tok-o">[</span><span class="tok-k">lambda</span><span class="tok-o">:</span> pruner<span class="tok-o">.</span>apply<span class="tok-o">(</span>model<span class="tok-o">)</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
     accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;   Epoch <span class="tok-o">{</span>epoch<span class="tok-o">+</span><span class="tok-m">1</span><span class="tok-o">}</span>/<span class="tok-o">{</span>num_finetune_epochs<span class="tok-o">}</span>: accuracy=<span class="tok-o">{</span>accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span>
-
-
 
 model<span class="tok-o">.</span>recover_model<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section><section class="nb-cell nb-markdown" data-cell="70"><p>Cubic sparsity schedule을 사용하여 iterative pruning을 수행하세요.</p></section><section class="nb-cell nb-code" data-cell="71"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">optimizer <span class="tok-o">=</span> torch<span class="tok-o">.</span>optim<span class="tok-o">.</span>SGD<span class="tok-o">(</span>model<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> lr<span class="tok-o">=</span><span class="tok-m">0.01</span><span class="tok-o">,</span> momentum<span class="tok-o">=</span><span class="tok-m">0.9</span><span class="tok-o">,</span> weight_decay<span class="tok-o">=</span><span class="tok-m">1e-4</span><span class="tok-o">)</span>
-
 scheduler <span class="tok-o">=</span> torch<span class="tok-o">.</span>optim<span class="tok-o">.</span>lr_scheduler<span class="tok-o">.</span>CosineAnnealingLR<span class="tok-o">(</span>optimizer<span class="tok-o">,</span> num_finetune_epochs <span class="tok-o">*</span> <span class="tok-b">len</span><span class="tok-o">(</span>dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;train&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">)</span>
-
 criterion <span class="tok-o">=</span> nn<span class="tok-o">.</span>CrossEntropyLoss<span class="tok-o">(</span><span class="tok-o">)</span>
 
-
-
 <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Finetuning Fine-grained Pruned Sparse Model with cubic sparsity scheduler&quot;<span class="tok-o">)</span>
-
 <span class="tok-k">for</span> epoch <span class="tok-k">in</span> <span class="tok-b">range</span><span class="tok-o">(</span>num_finetune_epochs<span class="tok-o">)</span><span class="tok-o">:</span>
-
     pruner <span class="tok-o">=</span> FineGrainedPrunerV2<span class="tok-o">(</span>model<span class="tok-o">,</span> cubic_sparsity_schedule<span class="tok-o">[</span>epoch<span class="tok-o">]</span><span class="tok-o">,</span> global_prune<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">)</span>
-
     train<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;train&#x27;</span><span class="tok-o">]</span><span class="tok-o">,</span> criterion<span class="tok-o">,</span> optimizer<span class="tok-o">,</span> scheduler<span class="tok-o">,</span>
-
           callbacks<span class="tok-o">=</span><span class="tok-o">[</span><span class="tok-k">lambda</span><span class="tok-o">:</span> pruner<span class="tok-o">.</span>apply<span class="tok-o">(</span>model<span class="tok-o">)</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
     accuracy <span class="tok-o">=</span> evaluate<span class="tok-o">(</span>model<span class="tok-o">,</span> dataloader<span class="tok-o">[</span><span class="tok-s">&#x27;test&#x27;</span><span class="tok-o">]</span><span class="tok-o">)</span>
-
     <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;   Epoch <span class="tok-o">{</span>epoch<span class="tok-o">+</span><span class="tok-m">1</span><span class="tok-o">}</span>/<span class="tok-o">{</span>num_finetune_epochs<span class="tok-o">}</span>: accuracy=<span class="tok-o">{</span>accuracy<span class="tok-o">:</span>.2f<span class="tok-o">}</span>%&quot;<span class="tok-o">)</span>
-
-
 
 model<span class="tok-o">.</span>recover_model<span class="tok-o">(</span><span class="tok-o">)</span></code></pre></section>
   </main>

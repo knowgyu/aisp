@@ -275,9 +275,20 @@ def span(class_name: str, value: str) -> str:
 
 def highlight_python(source: str) -> str:
     """Return scriptless GitHub-dark-ish highlighted Python HTML."""
+    line_offsets = [0]
+    for line in source.splitlines(keepends=True):
+        line_offsets.append(line_offsets[-1] + len(line))
+
+    def offset(position: tuple[int, int]) -> int:
+        line, column = position
+        if line <= 0:
+            return column
+        if line - 1 >= len(line_offsets):
+            return len(source)
+        return min(line_offsets[line - 1] + column, len(source))
+
     output: list[str] = []
-    cursor_line = 1
-    cursor_col = 0
+    cursor = 0
     try:
         tokens = tokenize.generate_tokens(io.StringIO(source).readline)
         for token in tokens:
@@ -285,13 +296,10 @@ def highlight_python(source: str) -> str:
             token_text = token.string
             if token_type in {tokenize.ENCODING, tokenize.ENDMARKER}:
                 continue
-            start_line, start_col = token.start
-            end_line, end_col = token.end
-            if start_line > cursor_line:
-                output.append("\n" * (start_line - cursor_line))
-                cursor_col = 0
-            if start_col > cursor_col:
-                output.append(" " * (start_col - cursor_col))
+            start = offset(token.start)
+            end = offset(token.end)
+            if start > cursor:
+                output.append(html.escape(source[cursor:start]))
             if token_type == tokenize.NAME:
                 if keyword.iskeyword(token_text):
                     output.append(span("k", token_text))
@@ -303,7 +311,9 @@ def highlight_python(source: str) -> str:
                 output.append(span(TOKEN_CLASS[token_type], token_text))
             else:
                 output.append(html.escape(token_text))
-            cursor_line, cursor_col = end_line, end_col
+            cursor = max(cursor, end)
+        if cursor < len(source):
+            output.append(html.escape(source[cursor:]))
         return "".join(output)
     except tokenize.TokenError:
         return html.escape(source)
