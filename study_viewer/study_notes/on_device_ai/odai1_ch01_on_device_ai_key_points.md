@@ -7,6 +7,24 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["Cloud AI"] -->|"큰 모델·큰 전력"| B["High accuracy"]
+  C["On-Device AI"] -->|"전력·메모리·지연 제한"| D["Efficient model"]
+  D --> E["Pruning"]
+  D --> F["Quantization"]
+  D --> G["Knowledge Distillation"]
+```
+
+| 관점 | Cloud 중심 | On-device 중심 |
+|---|---|---|
+| 병목 | GPU cost, throughput | latency, battery, memory bandwidth |
+| 모델 설계 | accuracy 우선 | accuracy와 efficiency trade-off |
+| 시험 포인트 | 성능 지표 | `MACs`, parameter, activation, bandwidth까지 같이 설명 |
+
+
 ## 1. 이 챕터의 핵심 질문
 
 요즘 AI 모델은 너무 커졌다. 하지만 모든 입력을 클라우드로 보내서 처리하면 latency, 비용, 개인정보, 네트워크 의존성 문제가 생긴다. 그래서 **AI 모델을 기기 안에서 직접 실행하기 위한 방법**이 필요하다.

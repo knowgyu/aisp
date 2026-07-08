@@ -196,13 +196,12 @@ body.sidebar-collapsed .doc-shell { width: min(1760px, 100%); }
 .markdown-body .mermaid svg {
   display: block;
   width: auto !important;
-  max-width: none !important;
-  min-width: min(980px, 100%);
-  min-height: 260px;
+  max-width: 100% !important;
+  height: auto !important;
 }
 .markdown-body .mermaid foreignObject,
 .markdown-body .mermaid text {
-  font-size: 17px !important;
+  font-size: 15px !important;
 }
 .loading { color: var(--muted); }
 .error-card h1 { color: #fff; }

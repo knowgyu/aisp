@@ -9,6 +9,25 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  X["input x"] --> T["Teacher\nlarge model"]
+  X --> S["Student\nsmall model"]
+  T --> P["soft targets"]
+  P --> L["KD loss"]
+  S --> L
+  Y["hard label"] --> CE["CE loss"] --> L
+```
+
+| 손실 | 학생이 배우는 것 | 왜 필요한가 |
+|---|---|---|
+| Hard CE | 정답 class | 기본 supervised signal |
+| Soft KD | class 간 상대적 유사도 | 작은 모델이 teacher의 decision boundary를 모방 |
+| Temperature | 확률 분포를 부드럽게 만듦 | dark knowledge를 더 잘 보이게 함 |
+
+
 ## 1. 이 챕터의 핵심 질문
 
 작은 모델은 on-device에 유리하지만, 보통 큰 모델보다 성능이 낮다. Knowledge Distillation은 이 문제를 해결하려고 한다.

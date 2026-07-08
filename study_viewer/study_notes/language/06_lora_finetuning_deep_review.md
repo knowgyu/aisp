@@ -5,6 +5,21 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  X["input"] --> W["frozen W"] --> Y["output"]
+  X --> A["LoRA A"] --> B["LoRA B"] --> Y
+```
+
+| 구성 | 학습 여부 | 의미 |
+|---|---|---|
+| base weight `W` | freeze | 원래 LLM 지식 보존 |
+| low-rank `A,B` | train | 작은 adapter만 업데이트 |
+| rank `r` | hyperparameter | 작을수록 가볍지만 표현력 제한 |
+
+
 ## 0. 한 장 요약
 
 LoRA는 기존 weight `W`를 직접 수정하지 않고 low-rank update `BA`만 학습한다.

@@ -1,5 +1,21 @@
 # On-Device AI 시험 대비 학습 준비 문맥
 
+
+## 그림으로 보는 전체 학습 흐름
+
+```mermaid
+flowchart LR
+  A["교안 개념"] --> B["수식/용어"] --> C["노트북 코드"] --> D["shape·metric 확인"] --> E["시험 답안화"]
+  B --> F["왜 그런가?" ]
+  C --> F
+```
+
+| 축 | 먼저 볼 것 | 코드에서 확인할 것 |
+|---|---|---|
+| Compression | pruning / quantization / KD | parameter count, bit-width, student loss |
+| Vision | CNN, ViT, DETR, U-Net | tensor shape `[B,C,H,W]`, token shape `[B,N,D]` |
+| LLM | tokenizer, attention, GPT, tuning | `[B,T]`, `[B,T,D]`, loss/PPL |
+
 상태: 실제 학습 전 준비용.
 자료 위치: `On-Device AI 강의자료/`
 

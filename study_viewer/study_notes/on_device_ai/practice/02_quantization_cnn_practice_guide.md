@@ -1,5 +1,19 @@
 # On-Device AI Practice 02 — Quantization for CNN 코드 기준 학습 가이드
 
+
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["FP model"] --> B["Prepare / observer"] --> C["Calibration"] --> D["Convert"] --> E["INT8 model"] --> F["Accuracy check"]
+```
+
+| 단계 | 코드에서 찾을 단어 | 역할 |
+|---|---|---|
+| observer | `MinMaxObserver`, `qconfig` | activation 범위 수집 |
+| calibration | eval data forward | scale/zero-point 추정 |
+| convert | quantized module | 실제 INT 연산 모듈로 교체 |
+
 > 같이 볼 원본 노트북: `On-Device AI 강의자료/실습/2. Quantization for CNN.ipynb`  
 > 핵심 목표: **FP32 CNN을 integer-friendly representation으로 바꾸는 수학, 코드, PyTorch API 흐름**을 연결해서 이해한다.
 

@@ -6,6 +6,26 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart TD
+  A["Dense weight matrix"] --> B{"무엇을 0으로 만들까?"}
+  B --> C["Fine-grained\n개별 weight"]
+  B --> D["Vector / N:M\n묶음 단위"]
+  B --> E["Channel / Filter\n구조 단위"]
+  C --> F["압축률 높음\nHW 가속 어려움"]
+  D --> G["규칙성 일부 확보"]
+  E --> H["행렬 크기 자체 감소\nHW 친화적"]
+```
+
+| 머릿속 그림 | 의미 | 실제 이득 조건 |
+|---|---|---|
+| 0이 많은 행렬 | sparsity 생성 | sparse format/kernel이 있어야 빠름 |
+| 열/행 통째 제거 | node/channel 제거 | dense GEMM 크기가 줄어 바로 빠름 |
+| N:M 패턴 | 일정한 블록 안에서 고정 개수만 유지 | accelerator가 해당 패턴을 지원할 때 |
+
+
 ## 1. 이 챕터의 핵심 질문
 
 딥러닝 모델은 보통 학습을 쉽게 하기 위해 **over-parameterized** 되어 있다. 즉, 필요한 것보다 weight가 많고, 그중 일부는 제거해도 성능에 큰 영향을 주지 않을 수 있다.

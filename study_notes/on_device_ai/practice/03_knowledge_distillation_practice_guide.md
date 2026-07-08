@@ -1,5 +1,25 @@
 # On-Device AI Practice 03 — Knowledge Distillation 코드 기준 학습 가이드
 
+
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  X["batch"] --> T["teacher.eval()"] --> TL["teacher logits"]
+  X --> S["student.train()"] --> SL["student logits"]
+  TL --> KD["KL / soft CE"]
+  SL --> KD
+  SL --> CE["hard CE"]
+  KD --> L["total loss"]
+  CE --> L
+```
+
+| 코드 포인트 | 봐야 할 것 | 왜 중요한가 |
+|---|---|---|
+| `torch.no_grad()` | teacher gradient 차단 | teacher는 고정된 기준 |
+| `temperature` | logits smoothing | class 간 유사도 전달 |
+| loss 가중합 | `alpha`, `1-alpha` | hard/soft signal 균형 |
+
 > 같이 볼 원본 노트북: `On-Device AI 강의자료/실습/3. Knowledge Distillation.ipynb`  
 > 핵심 목표: **큰 Teacher의 출력/중간표현을 작은 Student가 따라 하게 만들어 정확도를 회복하는 방법**을 코드와 수식으로 이해한다.
 

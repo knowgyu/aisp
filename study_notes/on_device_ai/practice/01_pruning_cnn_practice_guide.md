@@ -1,5 +1,19 @@
 # On-Device AI Practice 01 — Pruning for CNN 코드 기준 학습 가이드
 
+
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["Baseline CNN"] --> B["Select pruning target"] --> C["Apply mask"] --> D["Fine-tune"] --> E["Compare accuracy / sparsity"]
+```
+
+| 코드 블록 | 눈으로 확인할 것 | 의미 |
+|---|---|---|
+| model 정의 | Conv/Linear layer 이름 | 어떤 weight가 pruning되는지 |
+| pruning 함수 | mask buffer, zero weight | 실제 parameter가 0이 되는 위치 |
+| 평가 루프 | accuracy 변화 | pruning 후 성능 손실 |
+
 > 같이 볼 원본 노트북: `On-Device AI 강의자료/실습/1. Pruning for CNN.ipynb`  
 > 핵심 목표: **VGG-style CNN에서 weight를 0으로 만들고, mask를 유지하고, fine-tuning으로 정확도를 회복하는 전체 흐름**을 직접 구현할 수 있게 만든다.
 
@@ -21,10 +35,10 @@ $$
 
 ```mermaid
 flowchart LR
-  A[Dense CNN] --> B[중요도 계산: |w|]
-  B --> C[Mask 생성]
-  C --> D[W = W * M]
-  D --> E[정확도/크기/희소도 평가]
+  A["Dense CNN"] --> B["중요도 계산: abs(w)"]
+  B --> C["Mask 생성"]
+  C --> D["W = W * M"]
+  D --> E["정확도/크기/희소도 평가"]
   E --> F[Fine-tuning]
   F --> E
 ```

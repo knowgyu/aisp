@@ -6,6 +6,22 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["FP32 real value"] --> B["scale / zero-point"] --> C["INT8 code"] --> D["INT matmul"] --> E["dequantized output"]
+  B --> F["calibration"]
+  F --> G["min/max or percentile"]
+```
+
+| 기호 | 직관 | 코드에서 자주 보이는 값 |
+|---|---|---|
+| `scale` | 정수 한 칸이 실수로 얼마인지 | `s = (x_max-x_min)/(q_max-q_min)` |
+| `zero_point` | 실수 0이 정수 어디에 놓이는지 | asymmetric quantization에서 중요 |
+| clipping | 극단값을 잘라 level을 아낌 | activation observer/calibration |
+
+
 ## 1. 이 챕터의 핵심 질문
 
 모델의 weight와 activation은 보통 FP32/FP16 같은 floating-point로 표현된다. 그런데 on-device 환경에서는 memory와 bandwidth가 부족하다.

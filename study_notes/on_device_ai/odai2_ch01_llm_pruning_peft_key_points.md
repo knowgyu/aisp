@@ -8,6 +8,24 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart TD
+  A["LLM weight W"] --> B["Importance score"]
+  B --> C["Magnitude / Taylor / Wanda"]
+  C --> D["Mask M"]
+  D --> E["Pruned W = W ⊙ M"]
+  E --> F["PEFT / SPP로 회복"]
+```
+
+| 어디를 보는가 | 대표 기준 | 직관 |
+|---|---|---|
+| weight만 | magnitude | 작은 값은 영향이 작다고 가정 |
+| loss 변화 | Taylor/OBD/OBS | 지웠을 때 loss가 덜 오르는 항목 선택 |
+| activation 포함 | Wanda류 | 자주/크게 쓰이는 입력 방향은 보존 |
+
+
 ## 1. 이 챕터의 핵심 질문
 
 CNN에서는 magnitude pruning + fine-tuning이 어느 정도 가능했다. 하지만 LLM에서는 parameter 수가 100B 이상으로 커지고, retraining 비용이 너무 커진다.

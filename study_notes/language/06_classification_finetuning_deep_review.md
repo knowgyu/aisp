@@ -5,6 +5,20 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["text"] --> B["token ids"] --> C["encoder / GPT features"] --> D["pooling or CLS"] --> E["classification head"] --> F["class logits"]
+```
+
+| pretraining과 다른 점 | Pretraining | Classification fine-tuning |
+|---|---|---|
+| label | 다음 token | 문장/샘플 class |
+| head | vocab logits | class logits |
+| loss | token-level CE | sample-level CE |
+
+
 ## 0. 한 장 요약
 
 ```text

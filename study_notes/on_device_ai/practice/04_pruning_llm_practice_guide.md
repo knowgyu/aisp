@@ -1,5 +1,23 @@
 # On-Device AI Practice 04 — Pruning for LLM 코드 기준 학습 가이드
 
+
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart TD
+  A["Text dataset"] --> B["Tokenizer"] --> C["LLM forward"]
+  C --> D["Collect activations"]
+  D --> E["Score Linear weights"]
+  E --> F["Apply pruning mask"]
+  F --> G["Evaluate perplexity"]
+```
+
+| CNN pruning과 다른 점 | 이유 | 확인 지표 |
+|---|---|---|
+| Linear 중심 | Transformer 대부분이 projection/MLP matrix | layer별 sparsity |
+| activation-aware 중요 | token 분포에 따라 중요한 column이 달라짐 | Wanda score 등 |
+| accuracy 대신 PPL | next-token probability 품질 | PPL 증가폭 |
+
 > 같이 볼 원본 노트북: `On-Device AI 강의자료/실습/4. Pruning for LLM.ipynb`  
 > 핵심 목표: **LLM Linear layer의 weight를 magnitude/Wanda 기준으로 제거하고 perplexity 변화로 평가하는 흐름**을 이해한다.
 

@@ -5,6 +5,20 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["word / token"] --> B["one-hot id"] --> C["embedding lookup"] --> D["dense vector"] --> E["similarity / downstream model"]
+```
+
+| 표현 | 그림 | 한계/장점 |
+|---|---|---|
+| one-hot | 축 하나만 1 | 의미 유사도 표현 어려움 |
+| dense vector | 여러 차원에 의미 분산 | 거리/방향으로 관계 표현 |
+| embedding matrix | id → row lookup | 코드에서는 `nn.Embedding` |
+
+
 ## 0. 핵심 요약
 
 | 개념 | 의미 | 코드에서 보는 값 |

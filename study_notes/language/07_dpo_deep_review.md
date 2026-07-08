@@ -5,6 +5,24 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  P["prompt"] --> C["chosen answer"]
+  P --> R["rejected answer"]
+  C --> L["DPO preference loss"]
+  R --> L
+  Ref["reference model"] --> L
+```
+
+| RLHF와 비교 | RLHF/PPO | DPO |
+|---|---|---|
+| reward model | 별도 학습 필요 | 명시적 reward model 없이 preference loss |
+| 구현 난도 | 높음 | 상대적으로 단순 |
+| 핵심 데이터 | prompt + chosen/rejected | 같은 쌍 사용 |
+
+
 ## 0. 한 장 요약
 
 DPO는 사람이 선호한 답변(chosen)과 덜 선호한 답변(rejected)을 비교해 policy model을 업데이트한다.

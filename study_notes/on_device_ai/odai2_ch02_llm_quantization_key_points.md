@@ -6,6 +6,20 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["Pretrained LLM"] --> B["Calibration data"] --> C["Weight / activation statistics"] --> D["INT4/INT8 quantized model"] --> E["PPL / latency check"]
+```
+
+| 방법군 | 핵심 질문 | 예시 포인트 |
+|---|---|---|
+| Weight-only | weight만 줄여도 되는가 | GPTQ, AWQ, NF4 |
+| Weight+Activation | runtime activation까지 정수화 가능한가 | SmoothQuant류 |
+| Double quant | scale 자체도 압축할 수 있는가 | QLoRA의 storage 절감 |
+
+
 ## 1. 이 챕터의 핵심 질문
 
 CNN quantization은 INT8 QAT/PTQ 중심으로 설명할 수 있었다. LLM quantization은 더 어렵다.

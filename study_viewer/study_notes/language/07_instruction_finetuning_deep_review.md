@@ -5,6 +5,20 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["instruction"] --> B["prompt template"] --> C["model response"] --> D["supervised loss on answer tokens"]
+```
+
+| 데이터 필드 | 역할 | 주의점 |
+|---|---|---|
+| instruction | 사용자가 원하는 작업 | task 조건 |
+| input/context | 추가 정보 | 없을 수도 있음 |
+| output | 모범 답변 | loss를 주로 answer에만 걸기도 함 |
+
+
 ## 0. 한 장 요약
 
 ```text

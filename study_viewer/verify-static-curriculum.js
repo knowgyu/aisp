@@ -74,7 +74,7 @@ function validateStaticFiles() {
   assertCheck(!/allow-same-origin/.test(render), 'render.js does not allow notebook iframe same-origin access');
   assertCheck(/notebook-layout/.test(styles) && /grid-template-columns/.test(styles), 'styles define notebook split-view grid');
  assertCheck(/sidebar-collapsed/.test(styles), 'styles define collapsed sidebar layout');
- assertCheck(/\.mermaid svg/.test(styles) && /max-width:\s*none/.test(styles), 'styles keep wide Mermaid diagrams readable');
+ assertCheck(/\.mermaid svg/.test(styles) && /height:\s*auto/.test(styles), 'styles keep Mermaid diagrams readable without forced oversizing');
   assertCheck(/@media \(max-width/.test(styles), 'styles define responsive fallback');
   assertCheck(/font-size:\s*18\.5px/.test(styles), 'styles increase study body font size');
   assertCheck(/Pretendard|Noto Sans KR/.test(styles), 'styles include requested Korean font stack');

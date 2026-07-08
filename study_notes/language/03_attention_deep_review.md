@@ -5,6 +5,26 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart TD
+  X["x [B,T,D]"] --> Q["Q"]
+  X --> K["K"]
+  X --> V["V"]
+  Q --> S["QK^T / sqrt(d)"]
+  K --> S
+  S --> M["causal mask"] --> P["softmax"] --> C["context = P V"]
+  V --> C
+```
+
+| 행렬 | shape | 그림 직관 |
+|---|---:|---|
+| `QK^T` | `[B,T,T]` | 각 token이 어느 token을 볼지 점수표 |
+| causal mask | `[T,T]` | 오른쪽 위 미래 token 차단 |
+| `PV` | `[B,T,D]` | attention weight로 value를 섞은 결과 |
+
+
 ## 0. 한 장 요약
 
 ```text

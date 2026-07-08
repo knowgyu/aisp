@@ -5,6 +5,25 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart TD
+  A["Transformer inference"] --> B["Prefill"]
+  A --> C["Decode loop"]
+  C --> D["KV cache read/write"]
+  C --> E["Attention / MLP compute"]
+  D --> F["memory bandwidth bottleneck"]
+  E --> G["sparse attention / early exit / routing"]
+```
+
+| 단계 | 병목 | 줄이는 방법 |
+|---|---|---|
+| Prefill | 긴 prompt attention | sparse/linear attention |
+| Decode | token-by-token 반복 | KV cache, batching, speculative decoding |
+| MLP/Attention | 큰 matrix 연산 | pruning, quantization, dynamic routing |
+
+
 ## 1. 이 챕터의 핵심 질문
 
 LLM inference는 단순히 모델 weight를 줄이는 것만으로 충분하지 않다. decode는 sequential하고, attention은 긴 context에서 memory와 compute를 크게 요구한다.

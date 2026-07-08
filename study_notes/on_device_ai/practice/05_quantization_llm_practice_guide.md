@@ -1,5 +1,19 @@
 # On-Device AI Practice 05 — Quantization for LLM 코드 기준 학습 가이드
 
+
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["FP16/BF16 LLM"] --> B["Quant config"] --> C["Load quantized weights"] --> D["Generate / eval"] --> E["memory, speed, PPL"]
+```
+
+| 체크 지점 | 코드에서 보는 값 | 의미 |
+|---|---|---|
+| bit-width | 8bit / 4bit | weight 저장량 감소 |
+| compute dtype | fp16 / bf16 | 정수 weight를 어떤 dtype으로 계산하는지 |
+| device map | GPU/CPU 배치 | 실제 메모리 병목 위치 |
+
 > 같이 볼 원본 노트북: `On-Device AI 강의자료/실습/5. Quantization for LLM.ipynb`  
 > 핵심 목표: **LLM weight-only quantization, AWQ, SmoothQuant, GPTQ 계열 아이디어를 코드 흐름과 matrix shape 기준으로 이해한다.**
 

@@ -5,6 +5,21 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["raw text"] --> B["normalization"] --> C["tokenizer"] --> D["token ids [T]"] --> E["batch [B,T]"] --> F["model"]
+```
+
+| 변환 단계 | 예시 | 확인할 shape |
+|---|---|---|
+| text | 문자열 | Python `str` |
+| tokens | subword pieces | 길이 `T` |
+| ids | 정수 index | `[T]` 또는 `[B,T]` |
+| attention mask | pad 구분 | `[B,T]` |
+
+
 ## 0. 한 장 요약
 
 ```text

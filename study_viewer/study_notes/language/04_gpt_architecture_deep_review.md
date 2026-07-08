@@ -5,6 +5,22 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart TD
+  A["token ids"] --> B["token + position embedding"] --> C["GPT block x N"] --> D["LayerNorm"] --> E["LM head"] --> F["next-token logits"]
+  C --> C1["masked self-attention"]
+  C --> C2["MLP"]
+```
+
+| 블록 내부 | 역할 | 기억할 점 |
+|---|---|---|
+| masked attention | 이전 token context 수집 | 미래 token은 보지 못함 |
+| MLP | token별 비선형 변환 | sequence 위치별로 같은 FFN 적용 |
+| residual + norm | 학습 안정화 | deep stack 가능하게 함 |
+
+
 ## 0. GPT 전체 흐름
 
 ```text

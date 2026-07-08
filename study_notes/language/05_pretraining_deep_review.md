@@ -5,6 +5,21 @@
 
 ---
 
+## 그림으로 먼저 잡기
+
+```mermaid
+flowchart LR
+  A["corpus"] --> B["tokenize"] --> C["input ids"] --> D["GPT"] --> E["logits"] --> F["next-token CE loss"]
+  F --> G["backprop"] --> D
+```
+
+| 학습 데이터 한 줄 | 모델 입력 | 정답 |
+|---|---|---|
+| `The cat sat` | `The cat` | `cat sat`처럼 한 칸 shift |
+| batch | `[B,T]` | `[B,T]` labels |
+| loss | 모든 위치 평균 CE | next-token 예측 능력 |
+
+
 ## 0. Pretraining 목표
 
 언어모델 pretraining은 다음 token 예측이다.
