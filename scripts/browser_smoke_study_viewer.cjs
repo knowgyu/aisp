@@ -52,11 +52,17 @@ function loadPlaywright() {
 
     const frame = page.frame({ url: /01_pruning_cnn\.html/ });
     if (!frame) throw new Error('notebook frame not found by URL');
-    await frame.locator('.nb-cell').first().waitFor({ state: 'visible', timeout: 15000 });
-    await frame.locator('.nb-code').first().waitFor({ state: 'visible', timeout: 15000 });
-    await frame.locator('mjx-container').first().waitFor({ state: 'visible', timeout: 20000 });
-    const text = await frame.locator('body').innerText({ timeout: 15000 });
-    if (!/Pruning for CNN|Assignment 1/i.test(text)) throw new Error('notebook body text missing expected title');
+ await frame.locator('.nb-cell').first().waitFor({ state: 'visible', timeout: 15000 });
+ await frame.locator('.nb-code').first().waitFor({ state: 'visible', timeout: 15000 });
+ await frame.locator('.nb-lineno').first().waitFor({ state: 'visible', timeout: 15000 });
+ const codeHead = await frame.locator('.nb-code-head').first().innerText({ timeout: 15000 });
+ if (!/Code Cell \d{3}/.test(codeHead)) throw new Error(`code cell header missing stable cell number: ${codeHead}`);
+ if (/In \[/.test(codeHead)) throw new Error(`old Jupyter prompt survived in code cell header: ${codeHead}`);
+ const firstLineNumber = await frame.locator('.nb-lineno').first().innerText({ timeout: 15000 });
+ if (firstLineNumber.trim() !== '1') throw new Error(`first code line number is not 1: ${firstLineNumber}`);
+ await frame.locator('mjx-container').first().waitFor({ state: 'visible', timeout: 20000 });
+ const text = await frame.locator('body').innerText({ timeout: 15000 });
+ if (!/Pruning for CNN|Assignment 1/i.test(text)) throw new Error('notebook body text missing expected title');
 
     console.log('RESULT PASS browser split-view smoke');
     console.log(JSON.stringify({ guideBox, iframeBox, containerBox, sandbox }));

@@ -326,6 +326,18 @@ def highlight_python(source: str) -> str:
         return html.escape(source)
 
 
+def render_code_source(source: str) -> str:
+    highlighted = highlight_python(source)
+    lines = highlighted.splitlines()
+    if not lines:
+        lines = [""]
+    return "".join(
+        f'<span class="nb-code-line"><span class="nb-lineno">{idx}</span>'
+        f'<span class="nb-code-text">{line or " "}</span></span>'
+        for idx, line in enumerate(lines, start=1)
+    )
+
+
 def render_output(output) -> str:
     otype = output.get("output_type", "")
     if otype == "stream":
@@ -359,12 +371,15 @@ def convert(ipynb: Path, out: Path, title: str | None = None):
         ctype = cell.get("cell_type")
         src = join_source(cell.get("source", ""))
         if ctype == "markdown":
-            body = render_markdown(src)
+            body = f'<div class="nb-cell-head">Markdown Cell {idx:03d}</div>{render_markdown(src)}'
         elif ctype == "code":
             exec_count = cell.get("execution_count")
-            prompt = f"In [{exec_count if exec_count is not None else ' '}]:"
+            exec_label = f" · 실행 [{exec_count}]" if exec_count is not None else ""
             outputs = "".join(render_output(o) for o in cell.get("outputs", []))
-            body = f'<div class="nb-code-head">{html.escape(prompt)}</div><pre class="nb-code"><code class="language-python">{highlight_python(src)}</code></pre>{outputs}'
+            body = (
+                f'<div class="nb-cell-head nb-code-head">Code Cell {idx:03d}{html.escape(exec_label)}</div>'
+                f'<pre class="nb-code"><code class="language-python">{render_code_source(src)}</code></pre>{outputs}'
+            )
         else:
             body = f"<pre>{html.escape(src)}</pre>"
         cells.append(f'<section class="nb-cell nb-{html.escape(str(ctype))}" data-cell="{idx}">{body}</section>')
@@ -383,27 +398,31 @@ def convert(ipynb: Path, out: Path, title: str | None = None):
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <style>
-    :root {{ color-scheme: light; --bg:#f8fafc; --paper:#ffffff; --ink:#17202a; --muted:#5c6b7a; --line:#d9e2ec; --code:#0f172a; --code-ink:#d9f3ff; --accent:#2563eb; }}
-    * {{ box-sizing:border-box; }}
-    body {{ margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif; line-height:1.68; font-size:16px; }}
-    .nb-wrap {{ max-width:1080px; margin:0 auto; padding:28px 24px 72px; }}
-    .nb-title {{ margin:0 0 6px; font-size:30px; letter-spacing:-0.03em; }}
-    .nb-source {{ color:var(--muted); font-size:13px; margin:0 0 24px; word-break:break-all; }}
-    .nb-cell {{ background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:16px 0; box-shadow:0 8px 22px rgba(15,23,42,.05); overflow:auto; }}
-    .nb-markdown h1 {{ font-size:28px; }} .nb-markdown h2 {{ font-size:23px; border-bottom:1px solid var(--line); padding-bottom:8px; }} .nb-markdown h3 {{ font-size:19px; }}
-    .nb-markdown h1,.nb-markdown h2,.nb-markdown h3,.nb-markdown h4 {{ letter-spacing:-0.025em; line-height:1.25; }}
-    .nb-markdown table, .nb-output table {{ border-collapse:collapse; width:max-content; max-width:100%; margin:12px 0; }}
-    th,td {{ border:1px solid var(--line); padding:8px 10px; vertical-align:top; }} th {{ background:#eef4ff; }}
-    pre {{ white-space:pre-wrap; overflow:auto; }}
-    .nb-code-head {{ color:var(--accent); font-weight:800; margin-bottom:8px; font-size:13px; }}
-    .nb-code {{ background:var(--code); color:var(--code-ink); border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.58; }}
-    code {{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace; }}
+ :root {{ color-scheme: light; --bg:#f8fafc; --paper:#ffffff; --ink:#17202a; --muted:#5c6b7a; --line:#d9e2ec; --code:#0f172a; --code-ink:#d9f3ff; --accent:#2563eb; --gutter:#94a3b8; }}
+ * {{ box-sizing:border-box; }}
+ body {{ margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif; line-height:1.68; font-size:16px; }}
+ .nb-wrap {{ max-width:1080px; margin:0 auto; padding:28px 24px 72px; }}
+ .nb-title {{ margin:0 0 6px; font-size:30px; letter-spacing:-0.03em; }}
+ .nb-source {{ color:var(--muted); font-size:13px; margin:0 0 24px; word-break:break-all; }}
+ .nb-cell {{ background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:16px 0; box-shadow:0 8px 22px rgba(15,23,42,.05); overflow:auto; }}
+ .nb-cell-head {{ display:inline-flex; align-items:center; gap:6px; margin:0 0 10px; padding:4px 9px; border:1px solid #bfdbfe; border-radius:999px; background:#eff6ff; color:var(--accent); font-size:12px; font-weight:800; letter-spacing:.01em; }}
+ .nb-markdown h1 {{ font-size:28px; }} .nb-markdown h2 {{ font-size:23px; border-bottom:1px solid var(--line); padding-bottom:8px; }} .nb-markdown h3 {{ font-size:19px; }}
+ .nb-markdown h1,.nb-markdown h2,.nb-markdown h3,.nb-markdown h4 {{ letter-spacing:-0.025em; line-height:1.25; }}
+ .nb-markdown table, .nb-output table {{ border-collapse:collapse; width:max-content; max-width:100%; margin:12px 0; }}
+ th,td {{ border:1px solid var(--line); padding:8px 10px; vertical-align:top; }} th {{ background:#eef4ff; }}
+ pre {{ white-space:pre; overflow:auto; }}
+ .nb-code {{ background:var(--code); color:var(--code-ink); border-radius:12px; padding:12px 0; font-size:13px; line-height:1.58; tab-size:4; }}
+ .nb-code code {{ display:block; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace; }}
+ .nb-code-line {{ display:grid; grid-template-columns:4.25em minmax(0,1fr); column-gap:12px; padding:0 16px 0 0; min-height:1.58em; }}
+ .nb-lineno {{ user-select:none; color:var(--gutter); text-align:right; padding-right:12px; border-right:1px solid rgba(148,163,184,.35); }}
+ .nb-code-text {{ padding-left:0; white-space:pre; }}
+ code {{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace; }}
  .tok-k {{ color:#ff7b72; font-weight:650; }} .tok-b {{ color:#d2a8ff; }} .tok-s {{ color:#a5d6ff; }} .tok-m {{ color:#79c0ff; }} .tok-c {{ color:#8b949e; font-style:italic; }} .tok-o {{ color:#ff7b72; }}
-    .nb-output {{ margin-top:12px; border-left:4px solid #93c5fd; background:#f1f7ff; border-radius:10px; padding:10px 12px; }}
-    .nb-error {{ border-left-color:#ef4444; background:#fff1f2; }}
-    .nb-image img, .nb-markdown img, .nb-html img {{ max-width:100%; height:auto; display:block; }}
-    a {{ color:#1d4ed8; }}
-  </style>
+ .nb-output {{ margin-top:12px; border-left:4px solid #93c5fd; background:#f1f7ff; border-radius:10px; padding:10px 12px; }}
+ .nb-error {{ border-left-color:#ef4444; background:#fff1f2; }}
+ .nb-image img, .nb-markdown img, .nb-html img {{ max-width:100%; height:auto; display:block; }}
+ a {{ color:#1d4ed8; }}
+ </style>
 </head>
 <body>
   <main class="nb-wrap">

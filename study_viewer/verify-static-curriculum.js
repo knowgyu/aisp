@@ -202,6 +202,9 @@ function validateNotebookEntry(note, label) {
   assertCheck(!/javascript\s*:/i.test(htmlWithoutAllowedMathJax), `${label} notebook HTML has no javascript URLs`);
   assertCheck(/nb-cell/.test(htmlText), `${label} notebook HTML contains notebook cells`);
   assertCheck(/nb-code/.test(htmlText), `${label} notebook HTML contains code cells`);
+  assertCheck(/Code Cell \d{3}/.test(htmlText), `${label} notebook HTML labels code cells by cell number`);
+  assertCheck(/nb-code-line/.test(htmlText) && /nb-lineno/.test(htmlText), `${label} notebook HTML renders code line numbers`);
+  assertCheck(!/In \[/.test(htmlText), `${label} notebook HTML omits old Jupyter In prompt labels`);
         assertCheck(/language-python/.test(htmlText), `${label} notebook HTML marks Python code language`);
         assertCheck(/tok-k/.test(htmlText) && /tok-s/.test(htmlText), `${label} notebook HTML includes static syntax highlight spans`);
   assertCheck(/nb-markdown/.test(htmlText), `${label} notebook HTML contains markdown cells`);
