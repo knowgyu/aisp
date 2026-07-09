@@ -72,7 +72,41 @@ def image_refs(markdown: str):
         yield target
 
 
-def copy_referenced_assets(note_rel: str):
+
+def copy_file_if_changed(src: Path, dst: Path) -> bool:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists() and src.read_bytes() == dst.read_bytes():
+        return False
+    shutil.copy2(src, dst)
+    return True
+
+
+def write_text_if_changed(path: Path, content: str) -> bool:
+    if path.exists() and path.read_text(encoding='utf-8') == content:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding='utf-8')
+    return True
+
+
+def prune_unlisted_files(root: Path, allowed: set[Path]) -> int:
+    if not root.exists():
+        return 0
+    removed = 0
+    for item in sorted((p for p in root.rglob('*') if p.is_file()), reverse=True):
+        if item.resolve() not in allowed:
+            item.unlink()
+            removed += 1
+    for item in sorted((p for p in root.rglob('*') if p.is_dir()), reverse=True):
+        try:
+            item.rmdir()
+        except OSError:
+            pass
+    return removed
+
+
+def copy_referenced_assets(note_rel: str, allowed_public: set[Path]) -> int:
+    changed = 0
     src_note = ROOT / note_rel
     dst_note = ROOT / 'study_viewer' / note_rel
     for ref in image_refs(src_note.read_text(encoding='utf-8')):
@@ -83,28 +117,27 @@ def copy_referenced_assets(note_rel: str):
         # Keep copied assets inside the Pages artifact.
         if not str(dst_asset).startswith(str((ROOT / 'study_viewer').resolve())):
             raise RuntimeError(f'referenced asset would escape public artifact: {note_rel} -> {ref}')
-        dst_asset.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src_asset, dst_asset)
+        allowed_public.add(dst_asset)
+        changed += int(copy_file_if_changed(src_asset, dst_asset))
+    return changed
 
 
-def copy_allowed():
-    if DST.exists():
-        shutil.rmtree(DST)
-    # Remove generated external-asset mirrors that may have been copied by an
-    # older sync pass. The script will recreate only assets referenced by
-    # allow-listed Markdown.
-    for stale in [ROOT / 'study_viewer' / 'llm_lecture2']:
-        if stale.exists():
-            shutil.rmtree(stale)
+def copy_allowed() -> dict[str, int]:
+    stats = {'copied': 0, 'removed': 0}
+    allowed_public: set[Path] = set()
     for note in NOTES:
         rel = note['path']
         src = ROOT / rel
         dst = ROOT / 'study_viewer' / rel
         if not src.exists():
             raise FileNotFoundError(src)
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
-        copy_referenced_assets(rel)
+        allowed_public.add(dst.resolve())
+        stats['copied'] += int(copy_file_if_changed(src, dst))
+        stats['copied'] += copy_referenced_assets(rel, allowed_public)
+
+    stats['removed'] += prune_unlisted_files(DST, allowed_public)
+    stats['removed'] += prune_unlisted_files(ROOT / 'study_viewer' / 'llm_lecture2', allowed_public)
+
     for denied in DENIED:
         p = ROOT / 'study_viewer' / denied
         if p.exists():
@@ -112,13 +145,14 @@ def copy_allowed():
     stale_ch01_assets = ROOT / 'study_viewer' / 'study_notes' / 'on_device_ai' / 'assets' / 'ch01_cnn_pruning_slides'
     if stale_ch01_assets.exists():
         raise RuntimeError(f'denied ch01 asset directory still in public artifact: {stale_ch01_assets}')
+    return stats
 
 
-def write_manifest():
+def write_manifest() -> bool:
     out = 'window.AI_STUDY_NOTES = ' + json.dumps(NOTES, ensure_ascii=False, indent=2) + ';\n'
-    (ROOT / 'study_viewer' / 'notes-manifest.js').write_text(out, encoding='utf-8')
+    return write_text_if_changed(ROOT / 'study_viewer' / 'notes-manifest.js', out)
 
 if __name__ == '__main__':
-    copy_allowed()
-    write_manifest()
-    print(f'synced {len(NOTES)} public notes')
+    stats = copy_allowed()
+    manifest_changed = write_manifest()
+    print(f"synced {len(NOTES)} public notes (copied={stats['copied']} removed={stats['removed']} manifest_changed={int(manifest_changed)})")

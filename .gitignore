@@ -6,3 +6,5 @@
 *.xlsx
 *.bz2
 rag/1일차/RAG (Samsung, final).pdf
+
+__pycache__/
