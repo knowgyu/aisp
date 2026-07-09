@@ -1,7 +1,7 @@
 # Local-only vision course materials
-vision/
+/vision/
 # Local-only LLM hands-on materials
-llm_hands_on/
+/llm_hands_on/
 
 *.xlsx
 *.bz2

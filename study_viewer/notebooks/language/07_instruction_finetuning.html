@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLM Practice 07. Instruction Fine-tuning</title>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], processEscapes: true },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root { color-scheme: light; --bg:#f8fafc; --paper:#ffffff; --ink:#17202a; --muted:#5c6b7a; --line:#d9e2ec; --code:#0f172a; --code-ink:#d9f3ff; --accent:#2563eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif; line-height:1.68; font-size:16px; }
+    .nb-wrap { max-width:1080px; margin:0 auto; padding:28px 24px 72px; }
+    .nb-title { margin:0 0 6px; font-size:30px; letter-spacing:-0.03em; }
+    .nb-source { color:var(--muted); font-size:13px; margin:0 0 24px; word-break:break-all; }
+    .nb-cell { background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:16px 0; box-shadow:0 8px 22px rgba(15,23,42,.05); overflow:auto; }
+    .nb-markdown h1 { font-size:28px; } .nb-markdown h2 { font-size:23px; border-bottom:1px solid var(--line); padding-bottom:8px; } .nb-markdown h3 { font-size:19px; }
+    .nb-markdown h1,.nb-markdown h2,.nb-markdown h3,.nb-markdown h4 { letter-spacing:-0.025em; line-height:1.25; }
+    .nb-markdown table, .nb-output table { border-collapse:collapse; width:max-content; max-width:100%; margin:12px 0; }
+    th,td { border:1px solid var(--line); padding:8px 10px; vertical-align:top; } th { background:#eef4ff; }
+    pre { white-space:pre-wrap; overflow:auto; }
+    .nb-code-head { color:var(--accent); font-weight:800; margin-bottom:8px; font-size:13px; }
+    .nb-code { background:var(--code); color:var(--code-ink); border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.58; }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace; }
+ .tok-k { color:#ff7b72; font-weight:650; } .tok-b { color:#d2a8ff; } .tok-s { color:#a5d6ff; } .tok-m { color:#79c0ff; } .tok-c { color:#8b949e; font-style:italic; } .tok-o { color:#ff7b72; }
+    .nb-output { margin-top:12px; border-left:4px solid #93c5fd; background:#f1f7ff; border-radius:10px; padding:10px 12px; }
+    .nb-error { border-left-color:#ef4444; background:#fff1f2; }
+    .nb-image img, .nb-markdown img, .nb-html img { max-width:100%; height:auto; display:block; }
+    a { color:#1d4ed8; }
+  </style>
+</head>
+<body>
+  <main class="nb-wrap">
+    <h1 class="nb-title">LLM Practice 07. Instruction Fine-tuning</h1>
+    <p class="nb-source">Source notebook: llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb</p>
+    <section class="nb-cell nb-code" data-cell="1"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python"><span class="tok-c"># Copyright (c) Sebastian Raschka under Apache License 2.0 (see LICENSE.txt).</span>
+<span class="tok-c"># Source for &quot;Build a Large Language Model From Scratch&quot;</span>
+<span class="tok-c">#   - https://www.manning.com/books/build-a-large-language-model-from-scratch</span>
+<span class="tok-c"># Code: https://github.com/rasbt/LLMs-from-scratch</span>
+<span class="tok-c">#</span>
+<span class="tok-c"># 7장의 코드를 기반으로 한 최소한의 Instruction Finetuning 예제 파일</span>
+
+<span class="tok-k">from</span> functools <span class="tok-k">import</span> partial
+<span class="tok-k">from</span> importlib<span class="tok-o">.</span>metadata <span class="tok-k">import</span> version
+<span class="tok-k">import</span> json
+<span class="tok-k">import</span> os
+<span class="tok-k">import</span> re
+<span class="tok-k">import</span> time
+
+<span class="tok-k">import</span> matplotlib<span class="tok-o">.</span>pyplot <span class="tok-k">as</span> plt
+<span class="tok-k">import</span> requests
+<span class="tok-k">import</span> tiktoken
+<span class="tok-k">import</span> torch
+<span class="tok-k">from</span> torch<span class="tok-o">.</span>utils<span class="tok-o">.</span>data <span class="tok-k">import</span> Dataset<span class="tok-o">,</span> DataLoader
+<span class="tok-k">from</span> tqdm <span class="tok-k">import</span> tqdm
+
+<span class="tok-c"># 로컬 파일(이전 챕터에서 작성된 유틸리티 함수들)에서 필요한 모듈 임포트</span>
+<span class="tok-c"># GPTModel 구조, 생성 함수, 학습 루프 함수 등을 가져옵니다.</span>
+<span class="tok-k">from</span> previous_chapters <span class="tok-k">import</span> <span class="tok-o">(</span>
+    calc_loss_loader<span class="tok-o">,</span>
+    generate<span class="tok-o">,</span>
+    GPTModel<span class="tok-o">,</span>
+    text_to_token_ids<span class="tok-o">,</span>
+    train_model_simple<span class="tok-o">,</span>
+    token_ids_to_text<span class="tok-o">,</span>
+    load_gpt2_model
+<span class="tok-o">)</span>
+
+<span class="tok-k">class</span> InstructionDataset<span class="tok-o">(</span>Dataset<span class="tok-o">)</span><span class="tok-o">:</span>
+    <span class="tok-s">&quot;&quot;&quot;
+    지시사항(Instruction) 데이터셋을 처리하는 PyTorch Dataset 클래스.
+    입력 데이터(지시+입력)와 정답 데이터(응답)를 하나의 텍스트로 합쳐서 토큰화합니다.
+    &quot;&quot;&quot;</span>
+    <span class="tok-k">def</span> __init__<span class="tok-o">(</span>self<span class="tok-o">,</span> data<span class="tok-o">,</span> tokenizer<span class="tok-o">)</span><span class="tok-o">:</span>
+        self<span class="tok-o">.</span>data <span class="tok-o">=</span> data
+
+        <span class="tok-c"># 텍스트 데이터 미리 토큰화 (Pre-tokenize)</span>
+        self<span class="tok-o">.</span>encoded_texts <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span>
+        <span class="tok-k">for</span> entry <span class="tok-k">in</span> data<span class="tok-o">:</span>
+            <span class="tok-c"># 포맷팅 함수를 이용해 &quot;지시사항 + 입력&quot; 텍스트 생성</span>
+            instruction_plus_input <span class="tok-o">=</span> format_input<span class="tok-o">(</span>entry<span class="tok-o">)</span>
+            <span class="tok-c"># 정답(Response) 텍스트 생성</span>
+            response_text <span class="tok-o">=</span> f&quot;\n\n### Response:\n<span class="tok-o">{</span>entry<span class="tok-o">[</span><span class="tok-s">&#x27;output&#x27;</span><span class="tok-o">]</span><span class="tok-o">}</span>&quot;
+
+            <span class="tok-c"># 모델은 이 전체 텍스트(질문+답변)를 보고 다음 토큰을 예측하도록 학습됨</span>
+            full_text <span class="tok-o">=</span> instruction_plus_input <span class="tok-o">+</span> response_text
+            self<span class="tok-o">.</span>encoded_texts<span class="tok-o">.</span>append<span class="tok-o">(</span>
+                tokenizer<span class="tok-o">.</span>encode<span class="tok-o">(</span>full_text<span class="tok-o">)</span>
+            <span class="tok-o">)</span>
+
+    <span class="tok-k">def</span> __getitem__<span class="tok-o">(</span>self<span class="tok-o">,</span> index<span class="tok-o">)</span><span class="tok-o">:</span>
+        <span class="tok-k">return</span> self<span class="tok-o">.</span>encoded_texts<span class="tok-o">[</span>index<span class="tok-o">]</span>
+
+    <span class="tok-k">def</span> __len__<span class="tok-o">(</span>self<span class="tok-o">)</span><span class="tok-o">:</span>
+        <span class="tok-k">return</span> <span class="tok-b">len</span><span class="tok-o">(</span>self<span class="tok-o">.</span>data<span class="tok-o">)</span>
+
+
+<span class="tok-k">def</span> custom_collate_fn<span class="tok-o">(</span>
+    batch<span class="tok-o">,</span>
+    pad_token_id<span class="tok-o">=</span><span class="tok-m">50256</span><span class="tok-o">,</span>
+    ignore_index<span class="tok-o">=</span><span class="tok-o">-</span><span class="tok-m">100</span><span class="tok-o">,</span>
+    allowed_max_length<span class="tok-o">=</span><span class="tok-k">None</span><span class="tok-o">,</span>
+    device<span class="tok-o">=</span><span class="tok-s">&quot;cpu&quot;</span>
+<span class="tok-o">)</span><span class="tok-o">:</span>
+    <span class="tok-s">&quot;&quot;&quot;
+    데이터 로더에서 배치를 만들 때 사용하는 커스텀 함수.
+    가변 길이의 시퀀스를 배치의 최대 길이에 맞춰 패딩(padding)하고,
+    정답(target) 데이터에서 패딩 부분은 손실(loss) 계산에서 제외하도록 처리합니다.
+    &quot;&quot;&quot;</span>
+    <span class="tok-c"># 배치 내에서 가장 긴 시퀀스 길이 계산 (패딩을 위해 +1 여유)</span>
+    batch_max_length <span class="tok-o">=</span> <span class="tok-b">max</span><span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>item<span class="tok-o">)</span><span class="tok-o">+</span><span class="tok-m">1</span> <span class="tok-k">for</span> item <span class="tok-k">in</span> batch<span class="tok-o">)</span>
+
+    <span class="tok-c"># 입력(inputs)과 정답(targets) 리스트 준비</span>
+    inputs_lst<span class="tok-o">,</span> targets_lst <span class="tok-o">=</span> <span class="tok-o">[</span><span class="tok-o">]</span><span class="tok-o">,</span> <span class="tok-o">[</span><span class="tok-o">]</span>
+
+    <span class="tok-k">for</span> item <span class="tok-k">in</span> batch<span class="tok-o">:</span>
+        new_item <span class="tok-o">=</span> item<span class="tok-o">.</span>copy<span class="tok-o">(</span><span class="tok-o">)</span>
+        <span class="tok-c"># 문장 끝 토큰 &lt;|endoftext|&gt; 추가</span>
+        <span class="tok-c"># TODO: 시퀀스 끝에 추가할 토큰 값을 채우세요.</span>
+        <span class="tok-c"># 힌트: 패딩 전에 구분 토큰이 필요한 경우 pad_token_id를 추가합니다.</span>
+        new_item <span class="tok-o">+=</span> <span class="tok-o">[</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">]</span>
+
+        <span class="tok-c"># 가장 긴 길이에 맞춰 패딩 추가</span>
+        <span class="tok-c"># TODO: 패딩 토큰 값을 채우세요.</span>
+        <span class="tok-c"># 힌트: 모든 샘플 길이를 맞추기 위해 pad_token_id로 채웁니다.</span>
+        padded <span class="tok-o">=</span> new_item <span class="tok-o">+</span> <span class="tok-o">[</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">]</span> <span class="tok-o">*</span> <span class="tok-o">(</span>batch_max_length <span class="tok-o">-</span> <span class="tok-b">len</span><span class="tok-o">(</span>new_item<span class="tok-o">)</span><span class="tok-o">)</span>
+
+        <span class="tok-c"># TODO: 입력과 타깃 슬라이싱 인덱스를 채우세요.</span>
+        <span class="tok-c"># 힌트: 다음 토큰 예측에서는 inputs=padded[:-1], targets=padded[1:] 형태를 만듭니다.</span>
+        <span class="tok-c"># 입력은 마지막 토큰 제외 (0 ~ n-1)</span>
+        inputs <span class="tok-o">=</span> torch<span class="tok-o">.</span>tensor<span class="tok-o">(</span>padded<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">]</span><span class="tok-o">)</span>
+        <span class="tok-c"># 정답은 첫 번째 토큰 제외 (1 ~ n) -&gt; 다음 토큰 예측 문제이므로</span>
+        targets <span class="tok-o">=</span> torch<span class="tok-o">.</span>tensor<span class="tok-o">(</span>padded<span class="tok-o">[</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">:</span><span class="tok-o">]</span><span class="tok-o">)</span>
+
+        <span class="tok-c"># 중요: 패딩 부분 마스킹 처리</span>
+        <span class="tok-c"># 타겟에서 패딩 토큰인 부분은 ignore_index(-100)로 바꿔서 CrossEntropyLoss 계산 시 무시되게 함</span>
+        mask <span class="tok-o">=</span> targets <span class="tok-o">==</span> pad_token_id
+        indices <span class="tok-o">=</span> torch<span class="tok-o">.</span>nonzero<span class="tok-o">(</span>mask<span class="tok-o">)</span><span class="tok-o">.</span>squeeze<span class="tok-o">(</span><span class="tok-o">)</span>
+
+        <span class="tok-c"># 패딩이 시작되는 지점 이후의 모든 타겟 값을 -100으로 설정</span>
+        <span class="tok-c"># region [패딩 마스킹 처리]</span>
+        <span class="tok-c"># TODO: 패딩 무시 시작 인덱스를 채우세요.</span>
+        <span class="tok-c"># 힌트: 첫 번째 패딩은 유지하고 그 뒤의 패딩부터 ignore_index로 설정합니다.</span>
+        <span class="tok-k">if</span> indices<span class="tok-o">.</span>numel<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-o">&gt;</span> <span class="tok-m">1</span><span class="tok-o">:</span>
+            targets<span class="tok-o">[</span>indices<span class="tok-o">[</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">?</span><span class="tok-o">:</span><span class="tok-o">]</span><span class="tok-o">]</span> <span class="tok-o">=</span> ignore_index
+        <span class="tok-c"># endregion</span>
+
+        <span class="tok-c"># 선택적으로 최대 시퀀스 길이 제한 (메모리 관리 등 목적)</span>
+        <span class="tok-k">if</span> allowed_max_length <span class="tok-k">is</span> <span class="tok-k">not</span> <span class="tok-k">None</span><span class="tok-o">:</span>
+            inputs <span class="tok-o">=</span> inputs<span class="tok-o">[</span><span class="tok-o">:</span>allowed_max_length<span class="tok-o">]</span>
+            targets <span class="tok-o">=</span> targets<span class="tok-o">[</span><span class="tok-o">:</span>allowed_max_length<span class="tok-o">]</span>
+
+        inputs_lst<span class="tok-o">.</span>append<span class="tok-o">(</span>inputs<span class="tok-o">)</span>
+        targets_lst<span class="tok-o">.</span>append<span class="tok-o">(</span>targets<span class="tok-o">)</span>
+
+    <span class="tok-c"># 텐서로 변환 및 디바이스(GPU/CPU)로 이동</span>
+    inputs_tensor <span class="tok-o">=</span> torch<span class="tok-o">.</span>stack<span class="tok-o">(</span>inputs_lst<span class="tok-o">)</span><span class="tok-o">.</span>to<span class="tok-o">(</span>device<span class="tok-o">)</span>
+    targets_tensor <span class="tok-o">=</span> torch<span class="tok-o">.</span>stack<span class="tok-o">(</span>targets_lst<span class="tok-o">)</span><span class="tok-o">.</span>to<span class="tok-o">(</span>device<span class="tok-o">)</span>
+
+    <span class="tok-k">return</span> inputs_tensor<span class="tok-o">,</span> targets_tensor
+
+
+<span class="tok-k">def</span> download_and_load_file<span class="tok-o">(</span>file_path<span class="tok-o">,</span> url<span class="tok-o">)</span><span class="tok-o">:</span>
+    <span class="tok-s">&quot;&quot;&quot;
+    데이터 파일이 없으면 다운로드하고, JSON 형태로 로드하는 유틸리티 함수
+    &quot;&quot;&quot;</span>
+    <span class="tok-k">if</span> <span class="tok-k">not</span> os<span class="tok-o">.</span>path<span class="tok-o">.</span>exists<span class="tok-o">(</span>file_path<span class="tok-o">)</span><span class="tok-o">:</span>
+        response <span class="tok-o">=</span> requests<span class="tok-o">.</span>get<span class="tok-o">(</span>url<span class="tok-o">,</span> timeout<span class="tok-o">=</span><span class="tok-m">30</span><span class="tok-o">)</span>
+        response<span class="tok-o">.</span>raise_for_status<span class="tok-o">(</span><span class="tok-o">)</span>
+        text_data <span class="tok-o">=</span> response<span class="tok-o">.</span>text
+        <span class="tok-k">with</span> <span class="tok-b">open</span><span class="tok-o">(</span>file_path<span class="tok-o">,</span> <span class="tok-s">&quot;w&quot;</span><span class="tok-o">,</span> encoding<span class="tok-o">=</span><span class="tok-s">&quot;utf-8&quot;</span><span class="tok-o">)</span> <span class="tok-k">as</span> file<span class="tok-o">:</span>
+            file<span class="tok-o">.</span>write<span class="tok-o">(</span>text_data<span class="tok-o">)</span>
+
+    <span class="tok-k">with</span> <span class="tok-b">open</span><span class="tok-o">(</span>file_path<span class="tok-o">,</span> <span class="tok-s">&quot;r&quot;</span><span class="tok-o">,</span> encoding<span class="tok-o">=</span><span class="tok-s">&quot;utf-8&quot;</span><span class="tok-o">)</span> <span class="tok-k">as</span> file<span class="tok-o">:</span>
+        data <span class="tok-o">=</span> json<span class="tok-o">.</span>load<span class="tok-o">(</span>file<span class="tok-o">)</span>
+
+    <span class="tok-k">return</span> data
+
+
+<span class="tok-k">def</span> format_input<span class="tok-o">(</span>entry<span class="tok-o">)</span><span class="tok-o">:</span>
+    <span class="tok-s">&quot;&quot;&quot;
+    Alpaca 스타일의 프롬프트 템플릿을 적용하는 함수.
+    모델에게 역할을 부여하고 입력 형식을 통일합니다.
+    &quot;&quot;&quot;</span>
+    instruction_text <span class="tok-o">=</span> <span class="tok-o">(</span>
+        f&quot;Below is an instruction that describes a task. &quot;
+        f&quot;Write a response that appropriately completes the request.&quot;
+        f&quot;\n\n### Instruction:\n<span class="tok-o">{</span>entry<span class="tok-o">[</span><span class="tok-s">&#x27;instruction&#x27;</span><span class="tok-o">]</span><span class="tok-o">}</span>&quot;
+    <span class="tok-o">)</span>
+
+    <span class="tok-c"># 추가적인 입력 정보(Context 등)가 있는 경우 추가</span>
+    input_text <span class="tok-o">=</span> f&quot;\n\n### Input:\n<span class="tok-o">{</span>entry<span class="tok-o">[</span><span class="tok-s">&#x27;input&#x27;</span><span class="tok-o">]</span><span class="tok-o">}</span>&quot; <span class="tok-k">if</span> entry<span class="tok-o">[</span><span class="tok-s">&quot;input&quot;</span><span class="tok-o">]</span> <span class="tok-k">else</span> <span class="tok-s">&quot;&quot;</span>
+
+    <span class="tok-k">return</span> instruction_text <span class="tok-o">+</span> input_text
+
+
+<span class="tok-k">def</span> plot_losses<span class="tok-o">(</span>epochs_seen<span class="tok-o">,</span> tokens_seen<span class="tok-o">,</span> train_losses<span class="tok-o">,</span> val_losses<span class="tok-o">)</span><span class="tok-o">:</span>
+    <span class="tok-s">&quot;&quot;&quot;
+    학습 진행 상황(Loss)을 그래프로 시각화하여 PDF로 저장하는 함수
+    &quot;&quot;&quot;</span>
+    fig<span class="tok-o">,</span> ax1 <span class="tok-o">=</span> plt<span class="tok-o">.</span>subplots<span class="tok-o">(</span>figsize<span class="tok-o">=</span><span class="tok-o">(</span><span class="tok-m">12</span><span class="tok-o">,</span> <span class="tok-m">6</span><span class="tok-o">)</span><span class="tok-o">)</span>
+
+    <span class="tok-c"># 에폭(Epoch) 기준 Loss 그래프</span>
+    ax1<span class="tok-o">.</span>plot<span class="tok-o">(</span>epochs_seen<span class="tok-o">,</span> train_losses<span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&quot;Training loss&quot;</span><span class="tok-o">)</span>
+    ax1<span class="tok-o">.</span>plot<span class="tok-o">(</span>epochs_seen<span class="tok-o">,</span> val_losses<span class="tok-o">,</span> linestyle<span class="tok-o">=</span><span class="tok-s">&quot;-.&quot;</span><span class="tok-o">,</span> label<span class="tok-o">=</span><span class="tok-s">&quot;Validation loss&quot;</span><span class="tok-o">)</span>
+    ax1<span class="tok-o">.</span>set_xlabel<span class="tok-o">(</span><span class="tok-s">&quot;Epochs&quot;</span><span class="tok-o">)</span>
+    ax1<span class="tok-o">.</span>set_ylabel<span class="tok-o">(</span><span class="tok-s">&quot;Loss&quot;</span><span class="tok-o">)</span>
+    ax1<span class="tok-o">.</span>legend<span class="tok-o">(</span>loc<span class="tok-o">=</span><span class="tok-s">&quot;upper right&quot;</span><span class="tok-o">)</span>
+
+    <span class="tok-c"># 처리한 토큰 수(Tokens seen) 기준 보조 x축 생성</span>
+    ax2 <span class="tok-o">=</span> ax1<span class="tok-o">.</span>twiny<span class="tok-o">(</span><span class="tok-o">)</span>
+    ax2<span class="tok-o">.</span>plot<span class="tok-o">(</span>tokens_seen<span class="tok-o">,</span> train_losses<span class="tok-o">,</span> alpha<span class="tok-o">=</span><span class="tok-m">0</span><span class="tok-o">)</span>
+    ax2<span class="tok-o">.</span>set_xlabel<span class="tok-o">(</span><span class="tok-s">&quot;Tokens seen&quot;</span><span class="tok-o">)</span>
+
+    fig<span class="tok-o">.</span>tight_layout<span class="tok-o">(</span><span class="tok-o">)</span>
+    plot_name <span class="tok-o">=</span> <span class="tok-s">&quot;outputs/loss-plot-standalone.pdf&quot;</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Plot saved as <span class="tok-o">{</span>plot_name<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
+    plt<span class="tok-o">.</span>savefig<span class="tok-o">(</span>plot_name<span class="tok-o">)</span>
+    <span class="tok-c"># plt.show()</span>
+
+
+<span class="tok-k">def</span> main<span class="tok-o">(</span>test_mode<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span><span class="tok-o">:</span>
+    <span class="tok-c">#######################################</span>
+    <span class="tok-c"># 패키지 버전 출력 (디버깅용)</span>
+    <span class="tok-c">#######################################</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-o">)</span>
+    pkgs <span class="tok-o">=</span> <span class="tok-o">[</span>
+        <span class="tok-s">&quot;matplotlib&quot;</span><span class="tok-o">,</span>  <span class="tok-c"># 시각화</span>
+        <span class="tok-s">&quot;tiktoken&quot;</span><span class="tok-o">,</span>    <span class="tok-c"># 토크나이저</span>
+        <span class="tok-s">&quot;torch&quot;</span><span class="tok-o">,</span>       <span class="tok-c"># 딥러닝 프레임워크</span>
+        <span class="tok-s">&quot;tqdm&quot;</span><span class="tok-o">,</span>        <span class="tok-c"># 진행률 표시 바</span>
+    <span class="tok-o">]</span>
+    <span class="tok-k">for</span> p <span class="tok-k">in</span> pkgs<span class="tok-o">:</span>
+        <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;<span class="tok-o">{</span>p<span class="tok-o">}</span> version: <span class="tok-o">{</span>version<span class="tok-o">(</span>p<span class="tok-o">)</span><span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-m">50</span><span class="tok-o">*</span><span class="tok-s">&quot;-&quot;</span><span class="tok-o">)</span>
+
+    <span class="tok-c">#######################################</span>
+    <span class="tok-c"># 1. 데이터셋 다운로드 및 준비</span>
+    <span class="tok-c">#######################################</span>
+    file_path <span class="tok-o">=</span> <span class="tok-s">&quot;datas/instruction-data.json&quot;</span>
+    url <span class="tok-o">=</span> <span class="tok-s">&quot;https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch07/01_main-chapter-code/instruction-data.json&quot;</span>
+    data <span class="tok-o">=</span> download_and_load_file<span class="tok-o">(</span>file_path<span class="tok-o">,</span> url<span class="tok-o">)</span>
+
+    <span class="tok-c"># 데이터 분할 (Train 85% / Test 10% / Valid 5%)</span>
+    train_portion <span class="tok-o">=</span> <span class="tok-b">int</span><span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>data<span class="tok-o">)</span> <span class="tok-o">*</span> <span class="tok-m">0.85</span><span class="tok-o">)</span>
+    test_portion <span class="tok-o">=</span> <span class="tok-b">int</span><span class="tok-o">(</span><span class="tok-b">len</span><span class="tok-o">(</span>data<span class="tok-o">)</span> <span class="tok-o">*</span> <span class="tok-m">0.1</span><span class="tok-o">)</span>
+
+    train_data <span class="tok-o">=</span> data<span class="tok-o">[</span><span class="tok-o">:</span>train_portion<span class="tok-o">]</span>
+    test_data <span class="tok-o">=</span> data<span class="tok-o">[</span>train_portion<span class="tok-o">:</span>train_portion <span class="tok-o">+</span> test_portion<span class="tok-o">]</span>
+    val_data <span class="tok-o">=</span> data<span class="tok-o">[</span>train_portion <span class="tok-o">+</span> test_portion<span class="tok-o">:</span><span class="tok-o">]</span>
+
+    <span class="tok-c"># 테스트 모드일 경우 아주 적은 데이터만 사용 (빠른 실행 확인용)</span>
+    <span class="tok-k">if</span> test_mode<span class="tok-o">:</span>
+        train_data <span class="tok-o">=</span> train_data<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-m">10</span><span class="tok-o">]</span>
+        val_data <span class="tok-o">=</span> val_data<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-m">10</span><span class="tok-o">]</span>
+        test_data <span class="tok-o">=</span> test_data<span class="tok-o">[</span><span class="tok-o">:</span><span class="tok-m">10</span><span class="tok-o">]</span>
+
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Training set length:&quot;</span><span class="tok-o">,</span> <span class="tok-b">len</span><span class="tok-o">(</span>train_data<span class="tok-o">)</span><span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Validation set length:&quot;</span><span class="tok-o">,</span> <span class="tok-b">len</span><span class="tok-o">(</span>val_data<span class="tok-o">)</span><span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Test set length:&quot;</span><span class="tok-o">,</span> <span class="tok-b">len</span><span class="tok-o">(</span>test_data<span class="tok-o">)</span><span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-m">50</span><span class="tok-o">*</span><span class="tok-s">&quot;-&quot;</span><span class="tok-o">)</span>
+
+    <span class="tok-c"># 토크나이저 및 디바이스 설정</span>
+    tokenizer <span class="tok-o">=</span> tiktoken<span class="tok-o">.</span>get_encoding<span class="tok-o">(</span><span class="tok-s">&quot;gpt2&quot;</span><span class="tok-o">)</span>
+    device <span class="tok-o">=</span> torch<span class="tok-o">.</span>device<span class="tok-o">(</span><span class="tok-s">&quot;cuda&quot;</span> <span class="tok-k">if</span> torch<span class="tok-o">.</span>cuda<span class="tok-o">.</span>is_available<span class="tok-o">(</span><span class="tok-o">)</span> <span class="tok-k">else</span> <span class="tok-s">&quot;cpu&quot;</span><span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Device:&quot;</span><span class="tok-o">,</span> device<span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-m">50</span><span class="tok-o">*</span><span class="tok-s">&quot;-&quot;</span><span class="tok-o">)</span>
+
+    <span class="tok-c"># 커스텀 collate 함수 설정 (partial을 사용해 고정 인자 전달)</span>
+    customized_collate_fn <span class="tok-o">=</span> partial<span class="tok-o">(</span>custom_collate_fn<span class="tok-o">,</span> device<span class="tok-o">=</span>device<span class="tok-o">,</span> allowed_max_length<span class="tok-o">=</span><span class="tok-m">1024</span><span class="tok-o">)</span>
+
+    num_workers <span class="tok-o">=</span> <span class="tok-m">0</span>
+    batch_size <span class="tok-o">=</span> <span class="tok-m">8</span>
+    torch<span class="tok-o">.</span>manual_seed<span class="tok-o">(</span><span class="tok-m">123</span><span class="tok-o">)</span>
+
+    <span class="tok-c"># 학습용 데이터 로더</span>
+    train_dataset <span class="tok-o">=</span> InstructionDataset<span class="tok-o">(</span>train_data<span class="tok-o">,</span> tokenizer<span class="tok-o">)</span>
+    train_loader <span class="tok-o">=</span> DataLoader<span class="tok-o">(</span>
+        train_dataset<span class="tok-o">,</span>
+        batch_size<span class="tok-o">=</span>batch_size<span class="tok-o">,</span>
+        collate_fn<span class="tok-o">=</span>customized_collate_fn<span class="tok-o">,</span> <span class="tok-c"># 커스텀 배치 처리 함수 사용</span>
+        shuffle<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">,</span>
+        drop_last<span class="tok-o">=</span><span class="tok-k">True</span><span class="tok-o">,</span>
+        num_workers<span class="tok-o">=</span>num_workers
+    <span class="tok-o">)</span>
+
+    <span class="tok-c"># 검증용 데이터 로더</span>
+    val_dataset <span class="tok-o">=</span> InstructionDataset<span class="tok-o">(</span>val_data<span class="tok-o">,</span> tokenizer<span class="tok-o">)</span>
+    val_loader <span class="tok-o">=</span> DataLoader<span class="tok-o">(</span>
+        val_dataset<span class="tok-o">,</span>
+        batch_size<span class="tok-o">=</span>batch_size<span class="tok-o">,</span>
+        collate_fn<span class="tok-o">=</span>customized_collate_fn<span class="tok-o">,</span>
+        shuffle<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span>
+        drop_last<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">,</span>
+        num_workers<span class="tok-o">=</span>num_workers
+    <span class="tok-o">)</span>
+
+    <span class="tok-c">#######################################</span>
+    <span class="tok-c"># 2. 사전 학습된 모델 로드 (Pre-trained Model)</span>
+    <span class="tok-c">#######################################</span>
+
+    <span class="tok-k">if</span> test_mode<span class="tok-o">:</span>
+        <span class="tok-c"># 테스트 모드용 초소형 더미 모델</span>
+        BASE_CONFIG <span class="tok-o">=</span> <span class="tok-o">{</span>
+            <span class="tok-s">&quot;vocab_size&quot;</span><span class="tok-o">:</span> <span class="tok-m">50257</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;context_length&quot;</span><span class="tok-o">:</span> <span class="tok-m">120</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;drop_rate&quot;</span><span class="tok-o">:</span> <span class="tok-m">0.0</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;qkv_bias&quot;</span><span class="tok-o">:</span> <span class="tok-k">False</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;emb_dim&quot;</span><span class="tok-o">:</span> <span class="tok-m">12</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;n_layers&quot;</span><span class="tok-o">:</span> <span class="tok-m">1</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;n_heads&quot;</span><span class="tok-o">:</span> <span class="tok-m">2</span>
+        <span class="tok-o">}</span>
+        model <span class="tok-o">=</span> GPTModel<span class="tok-o">(</span>BASE_CONFIG<span class="tok-o">)</span>
+        model<span class="tok-o">.</span>eval<span class="tok-o">(</span><span class="tok-o">)</span>
+        device <span class="tok-o">=</span> <span class="tok-s">&quot;cpu&quot;</span>
+        CHOOSE_MODEL <span class="tok-o">=</span> <span class="tok-s">&quot;Small test model&quot;</span>
+
+    <span class="tok-k">else</span><span class="tok-o">:</span>
+        <span class="tok-c"># 실제 학습용 설정: GPT-2 Medium (355M)</span>
+        BASE_CONFIG <span class="tok-o">=</span> <span class="tok-o">{</span>
+            <span class="tok-s">&quot;vocab_size&quot;</span><span class="tok-o">:</span> <span class="tok-m">50257</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;context_length&quot;</span><span class="tok-o">:</span> <span class="tok-m">1024</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;drop_rate&quot;</span><span class="tok-o">:</span> <span class="tok-m">0.0</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;qkv_bias&quot;</span><span class="tok-o">:</span> <span class="tok-k">True</span>
+        <span class="tok-o">}</span>
+
+        model_configs <span class="tok-o">=</span> <span class="tok-o">{</span>
+            <span class="tok-s">&quot;gpt2-small (124M)&quot;</span><span class="tok-o">:</span> <span class="tok-o">{</span><span class="tok-s">&quot;emb_dim&quot;</span><span class="tok-o">:</span> <span class="tok-m">768</span><span class="tok-o">,</span> <span class="tok-s">&quot;n_layers&quot;</span><span class="tok-o">:</span> <span class="tok-m">12</span><span class="tok-o">,</span> <span class="tok-s">&quot;n_heads&quot;</span><span class="tok-o">:</span> <span class="tok-m">12</span><span class="tok-o">}</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;gpt2-medium (355M)&quot;</span><span class="tok-o">:</span> <span class="tok-o">{</span><span class="tok-s">&quot;emb_dim&quot;</span><span class="tok-o">:</span> <span class="tok-m">1024</span><span class="tok-o">,</span> <span class="tok-s">&quot;n_layers&quot;</span><span class="tok-o">:</span> <span class="tok-m">24</span><span class="tok-o">,</span> <span class="tok-s">&quot;n_heads&quot;</span><span class="tok-o">:</span> <span class="tok-m">16</span><span class="tok-o">}</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;gpt2-large (774M)&quot;</span><span class="tok-o">:</span> <span class="tok-o">{</span><span class="tok-s">&quot;emb_dim&quot;</span><span class="tok-o">:</span> <span class="tok-m">1280</span><span class="tok-o">,</span> <span class="tok-s">&quot;n_layers&quot;</span><span class="tok-o">:</span> <span class="tok-m">36</span><span class="tok-o">,</span> <span class="tok-s">&quot;n_heads&quot;</span><span class="tok-o">:</span> <span class="tok-m">20</span><span class="tok-o">}</span><span class="tok-o">,</span>
+            <span class="tok-s">&quot;gpt2-xl (1558M)&quot;</span><span class="tok-o">:</span> <span class="tok-o">{</span><span class="tok-s">&quot;emb_dim&quot;</span><span class="tok-o">:</span> <span class="tok-m">1600</span><span class="tok-o">,</span> <span class="tok-s">&quot;n_layers&quot;</span><span class="tok-o">:</span> <span class="tok-m">48</span><span class="tok-o">,</span> <span class="tok-s">&quot;n_heads&quot;</span><span class="tok-o">:</span> <span class="tok-m">25</span><span class="tok-o">}</span><span class="tok-o">,</span>
+        <span class="tok-o">}</span>
+
+        CHOOSE_MODEL <span class="tok-o">=</span> <span class="tok-s">&quot;gpt2-medium (355M)&quot;</span>
+        BASE_CONFIG<span class="tok-o">.</span>update<span class="tok-o">(</span>model_configs<span class="tok-o">[</span>CHOOSE_MODEL<span class="tok-o">]</span><span class="tok-o">)</span>
+
+        <span class="tok-c"># 로컬에 저장된 모델 가중치 파일 로드</span>
+        model_name <span class="tok-o">=</span> <span class="tok-s">&quot;gpt2-medium-355M.pth&quot;</span>
+        model <span class="tok-o">=</span> load_gpt2_model<span class="tok-o">(</span>model_name<span class="tok-o">,</span> BASE_CONFIG<span class="tok-o">)</span>
+
+        model<span class="tok-o">.</span>eval<span class="tok-o">(</span><span class="tok-o">)</span>
+        model<span class="tok-o">.</span>to<span class="tok-o">(</span>device<span class="tok-o">)</span>
+
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Loaded model:&quot;</span><span class="tok-o">,</span> CHOOSE_MODEL<span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-m">50</span><span class="tok-o">*</span><span class="tok-s">&quot;-&quot;</span><span class="tok-o">)</span>
+
+    <span class="tok-c">#######################################</span>
+    <span class="tok-c"># 3. 모델 미세 조정 (Finetuning)</span>
+    <span class="tok-c">#######################################</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Initial losses&quot;</span><span class="tok-o">)</span>
+    <span class="tok-c"># 학습 전 초기 손실값 확인</span>
+    <span class="tok-k">with</span> torch<span class="tok-o">.</span>no_grad<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">:</span>
+        train_loss <span class="tok-o">=</span> calc_loss_loader<span class="tok-o">(</span>train_loader<span class="tok-o">,</span> model<span class="tok-o">,</span> device<span class="tok-o">,</span> num_batches<span class="tok-o">=</span><span class="tok-m">5</span><span class="tok-o">)</span>
+        val_loss <span class="tok-o">=</span> calc_loss_loader<span class="tok-o">(</span>val_loader<span class="tok-o">,</span> model<span class="tok-o">,</span> device<span class="tok-o">,</span> num_batches<span class="tok-o">=</span><span class="tok-m">5</span><span class="tok-o">)</span>
+
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;   Training loss:&quot;</span><span class="tok-o">,</span> train_loss<span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;   Validation loss:&quot;</span><span class="tok-o">,</span> val_loss<span class="tok-o">)</span>
+
+    start_time <span class="tok-o">=</span> time<span class="tok-o">.</span>time<span class="tok-o">(</span><span class="tok-o">)</span>
+    <span class="tok-c"># 옵티마이저 설정 (AdamW)</span>
+    optimizer <span class="tok-o">=</span> torch<span class="tok-o">.</span>optim<span class="tok-o">.</span>AdamW<span class="tok-o">(</span>model<span class="tok-o">.</span>parameters<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> lr<span class="tok-o">=</span><span class="tok-m">0.00005</span><span class="tok-o">,</span> weight_decay<span class="tok-o">=</span><span class="tok-m">0.1</span><span class="tok-o">)</span>
+
+    num_epochs <span class="tok-o">=</span> <span class="tok-m">2</span>
+
+    torch<span class="tok-o">.</span>manual_seed<span class="tok-o">(</span><span class="tok-m">123</span><span class="tok-o">)</span>
+
+    <span class="tok-c"># 실제 학습 수행 (previous_chapters.py에 정의된 함수 사용)</span>
+    train_losses<span class="tok-o">,</span> val_losses<span class="tok-o">,</span> tokens_seen <span class="tok-o">=</span> train_model_simple<span class="tok-o">(</span>
+        model<span class="tok-o">,</span> train_loader<span class="tok-o">,</span> val_loader<span class="tok-o">,</span> optimizer<span class="tok-o">,</span> device<span class="tok-o">,</span>
+        num_epochs<span class="tok-o">=</span>num_epochs<span class="tok-o">,</span> eval_freq<span class="tok-o">=</span><span class="tok-m">5</span><span class="tok-o">,</span> eval_iter<span class="tok-o">=</span><span class="tok-m">5</span><span class="tok-o">,</span>
+        start_context<span class="tok-o">=</span>format_input<span class="tok-o">(</span>val_data<span class="tok-o">[</span><span class="tok-m">0</span><span class="tok-o">]</span><span class="tok-o">)</span><span class="tok-o">,</span> tokenizer<span class="tok-o">=</span>tokenizer
+    <span class="tok-o">)</span>
+
+    end_time <span class="tok-o">=</span> time<span class="tok-o">.</span>time<span class="tok-o">(</span><span class="tok-o">)</span>
+    execution_time_minutes <span class="tok-o">=</span> <span class="tok-o">(</span>end_time <span class="tok-o">-</span> start_time<span class="tok-o">)</span> <span class="tok-o">/</span> <span class="tok-m">60</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Training completed in <span class="tok-o">{</span>execution_time_minutes<span class="tok-o">:</span>.2f<span class="tok-o">}</span> minutes.&quot;<span class="tok-o">)</span>
+
+    <span class="tok-c"># 학습 결과 시각화</span>
+    epochs_tensor <span class="tok-o">=</span> torch<span class="tok-o">.</span>linspace<span class="tok-o">(</span><span class="tok-m">0</span><span class="tok-o">,</span> num_epochs<span class="tok-o">,</span> <span class="tok-b">len</span><span class="tok-o">(</span>train_losses<span class="tok-o">)</span><span class="tok-o">)</span>
+    plot_losses<span class="tok-o">(</span>epochs_tensor<span class="tok-o">,</span> tokens_seen<span class="tok-o">,</span> train_losses<span class="tok-o">,</span> val_losses<span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-m">50</span><span class="tok-o">*</span><span class="tok-s">&quot;-&quot;</span><span class="tok-o">)</span>
+
+    <span class="tok-c">#######################################</span>
+    <span class="tok-c"># 4. 결과 저장 및 테스트</span>
+    <span class="tok-c">#######################################</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span><span class="tok-s">&quot;Generating responses&quot;</span><span class="tok-o">)</span>
+    <span class="tok-c"># 테스트 데이터셋에 대해 모델 응답 생성</span>
+    <span class="tok-k">for</span> i<span class="tok-o">,</span> entry <span class="tok-k">in</span> tqdm<span class="tok-o">(</span><span class="tok-b">enumerate</span><span class="tok-o">(</span>test_data<span class="tok-o">)</span><span class="tok-o">,</span> total<span class="tok-o">=</span><span class="tok-b">len</span><span class="tok-o">(</span>test_data<span class="tok-o">)</span><span class="tok-o">)</span><span class="tok-o">:</span>
+
+        input_text <span class="tok-o">=</span> format_input<span class="tok-o">(</span>entry<span class="tok-o">)</span>
+
+        <span class="tok-c"># 모델 생성 (Inference)</span>
+        token_ids <span class="tok-o">=</span> generate<span class="tok-o">(</span>
+            model<span class="tok-o">=</span>model<span class="tok-o">,</span>
+            idx<span class="tok-o">=</span>text_to_token_ids<span class="tok-o">(</span>input_text<span class="tok-o">,</span> tokenizer<span class="tok-o">)</span><span class="tok-o">.</span>to<span class="tok-o">(</span>device<span class="tok-o">)</span><span class="tok-o">,</span>
+            max_new_tokens<span class="tok-o">=</span><span class="tok-m">256</span><span class="tok-o">,</span>
+            context_size<span class="tok-o">=</span>BASE_CONFIG<span class="tok-o">[</span><span class="tok-s">&quot;context_length&quot;</span><span class="tok-o">]</span><span class="tok-o">,</span>
+            eos_id<span class="tok-o">=</span><span class="tok-m">50256</span>
+        <span class="tok-o">)</span>
+        generated_text <span class="tok-o">=</span> token_ids_to_text<span class="tok-o">(</span>token_ids<span class="tok-o">,</span> tokenizer<span class="tok-o">)</span>
+
+        <span class="tok-c"># 프롬프트 부분을 제거하고 응답 부분만 추출</span>
+        response_text <span class="tok-o">=</span> generated_text<span class="tok-o">[</span><span class="tok-b">len</span><span class="tok-o">(</span>input_text<span class="tok-o">)</span><span class="tok-o">:</span><span class="tok-o">]</span><span class="tok-o">.</span>replace<span class="tok-o">(</span><span class="tok-s">&quot;### Response:&quot;</span><span class="tok-o">,</span> <span class="tok-s">&quot;&quot;</span><span class="tok-o">)</span><span class="tok-o">.</span>strip<span class="tok-o">(</span><span class="tok-o">)</span>
+
+        test_data<span class="tok-o">[</span>i<span class="tok-o">]</span><span class="tok-o">[</span><span class="tok-s">&quot;model_response&quot;</span><span class="tok-o">]</span> <span class="tok-o">=</span> response_text
+
+    <span class="tok-c"># 생성된 응답을 포함하여 JSON 파일로 저S장</span>
+    test_data_path <span class="tok-o">=</span> <span class="tok-s">&quot;outputs/instruction-data-with-response-standalone.json&quot;</span>
+    <span class="tok-k">with</span> <span class="tok-b">open</span><span class="tok-o">(</span>test_data_path<span class="tok-o">,</span> <span class="tok-s">&quot;w&quot;</span><span class="tok-o">)</span> <span class="tok-k">as</span> file<span class="tok-o">:</span>
+        json<span class="tok-o">.</span>dump<span class="tok-o">(</span>test_data<span class="tok-o">,</span> file<span class="tok-o">,</span> indent<span class="tok-o">=</span><span class="tok-m">4</span><span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Responses saved as <span class="tok-o">{</span>test_data_path<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
+
+    <span class="tok-c"># 미세 조정된 모델 가중치 저장</span>
+    file_name <span class="tok-o">=</span> f&quot;outputs/<span class="tok-o">{</span>re<span class="tok-o">.</span>sub<span class="tok-o">(</span><span class="tok-s">r&#x27;[ ()]&#x27;</span><span class="tok-o">,</span> <span class="tok-s">&#x27;&#x27;</span><span class="tok-o">,</span> CHOOSE_MODEL<span class="tok-o">)</span> <span class="tok-o">}</span>-sft-standalone.pth&quot;
+    torch<span class="tok-o">.</span>save<span class="tok-o">(</span>model<span class="tok-o">.</span>state_dict<span class="tok-o">(</span><span class="tok-o">)</span><span class="tok-o">,</span> file_name<span class="tok-o">)</span>
+    <span class="tok-b">print</span><span class="tok-o">(</span>f&quot;Model saved as <span class="tok-o">{</span>file_name<span class="tok-o">}</span>&quot;<span class="tok-o">)</span>
+
+</code></pre></section><section class="nb-cell nb-code" data-cell="2"><div class="nb-code-head">In [ ]:</div><pre class="nb-code"><code class="language-python">main<span class="tok-o">(</span>test_mode<span class="tok-o">=</span><span class="tok-k">False</span><span class="tok-o">)</span>
+</code></pre></section>
+  </main>
+</body>
+</html>

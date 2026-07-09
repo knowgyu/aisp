@@ -58,3 +58,30 @@ Vision 05+ generative material은 이번 시험 준비 public viewer 범위에�
 | 01 | [RAG Day 1 Lecture Review](rag/day1/01_rag_day1_lecture_review.md) | `rag/1일차/` PDF/HTML 자료 |
 | Practice 01 | [LlamaIndex Query Engine](rag/practice/01_llama_index_practice_guide.md) | `rag/1일차/실습 자료/Code/1. Llama_index.ipynb` |
 | Practice 02 | [RAG App Configuration](rag/practice/02_rag_practice_guide.md) | `rag/1일차/실습 자료/Code/2. RAG.ipynb` |
+
+## Vision — Notebook practice guides
+
+| 순서 | 실습 가이드 | 원본 notebook |
+|---:|---|---|
+| Practice 01 | [ResNet18 CIFAR-10 코드 학습](vision/practice/01_resnet18_cifar10_practice_guide.md) | `vision/01_ResNet18_CIFAR10.ipynb` |
+| Practice 02 | [ViT CIFAR-10 코드 학습](vision/practice/02_vit_cifar10_practice_guide.md) | `vision/02_ViT_CIFAR10.ipynb` |
+| Practice 03 | [DETR 코드 학습](vision/practice/03_detr_practice_guide.md) | `vision/03_DETR.ipynb` |
+| Practice 04 | [U-Net Segmentation 코드 학습](vision/practice/04_unet_practice_guide.md) | `vision/04_Unet.ipynb` |
+
+> Vision 05 DDPM, 06 Stable Diffusion 등 generative/GAN 계열은 이번 범위에서 제외했습니다.
+
+## LLM — Notebook practice guides
+
+| 순서 | 실습 가이드 | 원본 notebook |
+|---:|---|---|
+| Practice 01 | [Vector Space 코드 학습](language/practice/01_vector_space_practice_guide.md) | `llm_hands_on/Chapter_1_Exercise_Vector Space.ipynb` |
+| Practice 02 | [Dataset / Tokenizer 코드 학습](language/practice/02_dataset_practice_guide.md) | `llm_hands_on/Chapter_2_Exercise_Dataset.ipynb` |
+| Practice 03 | [Attention 코드 학습](language/practice/03_attention_practice_guide.md) | `llm_hands_on/Chapter_3_Excercise_Attention.ipynb` |
+| Practice 03+ | [Attention Visualization 코드 학습](language/practice/03_attention_visualization_practice_guide.md) | `llm_hands_on/Chapter_3_Excercise_Viz_Multi_head_attention.ipynb` |
+| Practice 04 | [GPT Architecture 코드 학습](language/practice/04_gpt_practice_guide.md) | `llm_hands_on/Chapter_4_Excercise_GPT.ipynb` |
+| Practice 05 | [Pretraining 코드 학습](language/practice/05_pretraining_practice_guide.md) | `llm_hands_on/Chapter_5_Excercise_Pretraining.ipynb` |
+| Practice 06 | [Classification Fine-tuning 코드 학습](language/practice/06_classification_finetuning_practice_guide.md) | `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification.ipynb` |
+| Practice 06+ | [LoRA Classification 코드 학습](language/practice/06_lora_classification_practice_guide.md) | `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb` |
+| Practice 07 | [Instruction Fine-tuning 코드 학습](language/practice/07_instruction_finetuning_practice_guide.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb` |
+| Practice 07+ | [DPO 코드 학습](language/practice/07_dpo_practice_guide.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb` |
+

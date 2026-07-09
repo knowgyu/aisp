@@ -177,6 +177,132 @@ window.AI_STUDY_NOTES = [
     "path": "study_notes/language/07_dpo_deep_review.md"
   },
   {
+    "id": "vision-practice-01-resnet18-cifar10",
+    "kind": "notebook",
+    "title": "Vision Practice 01. ResNet18 CIFAR-10 코드 학습",
+    "section": "Vision / Practice",
+    "path": "study_notes/vision/practice/01_resnet18_cifar10_practice_guide.md",
+    "notebookHtml": "notebooks/vision/01_resnet18_cifar10.html",
+    "sourceIpynb": "vision/01_ResNet18_CIFAR10.ipynb"
+  },
+  {
+    "id": "vision-practice-02-vit-cifar10",
+    "kind": "notebook",
+    "title": "Vision Practice 02. ViT CIFAR-10 코드 학습",
+    "section": "Vision / Practice",
+    "path": "study_notes/vision/practice/02_vit_cifar10_practice_guide.md",
+    "notebookHtml": "notebooks/vision/02_vit_cifar10.html",
+    "sourceIpynb": "vision/02_ViT_CIFAR10.ipynb"
+  },
+  {
+    "id": "vision-practice-03-detr",
+    "kind": "notebook",
+    "title": "Vision Practice 03. DETR 코드 학습",
+    "section": "Vision / Practice",
+    "path": "study_notes/vision/practice/03_detr_practice_guide.md",
+    "notebookHtml": "notebooks/vision/03_detr.html",
+    "sourceIpynb": "vision/03_DETR.ipynb"
+  },
+  {
+    "id": "vision-practice-04-unet",
+    "kind": "notebook",
+    "title": "Vision Practice 04. U-Net Segmentation 코드 학습",
+    "section": "Vision / Practice",
+    "path": "study_notes/vision/practice/04_unet_practice_guide.md",
+    "notebookHtml": "notebooks/vision/04_unet.html",
+    "sourceIpynb": "vision/04_Unet.ipynb"
+  },
+  {
+    "id": "llm-practice-01-vector-space",
+    "kind": "notebook",
+    "title": "LLM Practice 01. Vector Space 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/01_vector_space_practice_guide.md",
+    "notebookHtml": "notebooks/language/01_vector_space.html",
+    "sourceIpynb": "llm_hands_on/Chapter_1_Exercise_Vector Space.ipynb"
+  },
+  {
+    "id": "llm-practice-02-dataset",
+    "kind": "notebook",
+    "title": "LLM Practice 02. Dataset / Tokenizer 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/02_dataset_practice_guide.md",
+    "notebookHtml": "notebooks/language/02_dataset.html",
+    "sourceIpynb": "llm_hands_on/Chapter_2_Exercise_Dataset.ipynb"
+  },
+  {
+    "id": "llm-practice-03-attention",
+    "kind": "notebook",
+    "title": "LLM Practice 03. Attention 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/03_attention_practice_guide.md",
+    "notebookHtml": "notebooks/language/03_attention.html",
+    "sourceIpynb": "llm_hands_on/Chapter_3_Excercise_Attention.ipynb"
+  },
+  {
+    "id": "llm-practice-03-attention-visualization",
+    "kind": "notebook",
+    "title": "LLM Practice 03+. Attention Visualization 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/03_attention_visualization_practice_guide.md",
+    "notebookHtml": "notebooks/language/03_attention_visualization.html",
+    "sourceIpynb": "llm_hands_on/Chapter_3_Excercise_Viz_Multi_head_attention.ipynb"
+  },
+  {
+    "id": "llm-practice-04-gpt",
+    "kind": "notebook",
+    "title": "LLM Practice 04. GPT Architecture 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/04_gpt_practice_guide.md",
+    "notebookHtml": "notebooks/language/04_gpt.html",
+    "sourceIpynb": "llm_hands_on/Chapter_4_Excercise_GPT.ipynb"
+  },
+  {
+    "id": "llm-practice-05-pretraining",
+    "kind": "notebook",
+    "title": "LLM Practice 05. Pretraining 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/05_pretraining_practice_guide.md",
+    "notebookHtml": "notebooks/language/05_pretraining.html",
+    "sourceIpynb": "llm_hands_on/Chapter_5_Excercise_Pretraining.ipynb"
+  },
+  {
+    "id": "llm-practice-06-classification-finetuning",
+    "kind": "notebook",
+    "title": "LLM Practice 06. Classification Fine-tuning 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/06_classification_finetuning_practice_guide.md",
+    "notebookHtml": "notebooks/language/06_classification_finetuning.html",
+    "sourceIpynb": "llm_hands_on/Chapter_6_Excercise_Finetuning_Classification.ipynb"
+  },
+  {
+    "id": "llm-practice-06-lora-classification",
+    "kind": "notebook",
+    "title": "LLM Practice 06+. LoRA Classification 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/06_lora_classification_practice_guide.md",
+    "notebookHtml": "notebooks/language/06_lora_classification.html",
+    "sourceIpynb": "llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb"
+  },
+  {
+    "id": "llm-practice-07-instruction-finetuning",
+    "kind": "notebook",
+    "title": "LLM Practice 07. Instruction Fine-tuning 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/07_instruction_finetuning_practice_guide.md",
+    "notebookHtml": "notebooks/language/07_instruction_finetuning.html",
+    "sourceIpynb": "llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb"
+  },
+  {
+    "id": "llm-practice-07-dpo",
+    "kind": "notebook",
+    "title": "LLM Practice 07+. DPO 코드 학습",
+    "section": "Language / LLM Practice",
+    "path": "study_notes/language/practice/07_dpo_practice_guide.md",
+    "notebookHtml": "notebooks/language/07_dpo.html",
+    "sourceIpynb": "llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb"
+  },
+  {
     "id": "study-notes-rag-day1-lecture-review",
     "title": "RAG Day 1. Retrieval-Augmented Generation 깊은 복습",
     "section": "RAG / Day 1",

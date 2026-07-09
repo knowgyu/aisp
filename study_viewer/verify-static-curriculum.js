@@ -19,6 +19,21 @@ const EXPECTED_NOTEBOOKS = new Map([
   ['on-device-practice-03-knowledge-distillation', 'notebooks/on_device_ai/03_knowledge_distillation.html'],
   ['on-device-practice-04-pruning-llm', 'notebooks/on_device_ai/04_pruning_llm.html'],
   ['on-device-practice-05-quantization-llm', 'notebooks/on_device_ai/05_quantization_llm.html'],
+  ['vision-practice-01-resnet18-cifar10', 'notebooks/vision/01_resnet18_cifar10.html'],
+  ['vision-practice-02-vit-cifar10', 'notebooks/vision/02_vit_cifar10.html'],
+  ['vision-practice-03-detr', 'notebooks/vision/03_detr.html'],
+  ['vision-practice-04-unet', 'notebooks/vision/04_unet.html'],
+  ['llm-practice-01-vector-space', 'notebooks/language/01_vector_space.html'],
+  ['llm-practice-02-dataset', 'notebooks/language/02_dataset.html'],
+  ['llm-practice-03-attention', 'notebooks/language/03_attention.html'],
+  ['llm-practice-03-attention-visualization', 'notebooks/language/03_attention_visualization.html'],
+  ['llm-practice-04-gpt', 'notebooks/language/04_gpt.html'],
+  ['llm-practice-05-pretraining', 'notebooks/language/05_pretraining.html'],
+  ['llm-practice-06-classification-finetuning', 'notebooks/language/06_classification_finetuning.html'],
+  ['llm-practice-06-lora-classification', 'notebooks/language/06_lora_classification.html'],
+  ['llm-practice-07-instruction-finetuning', 'notebooks/language/07_instruction_finetuning.html'],
+  ['llm-practice-07-dpo', 'notebooks/language/07_dpo.html'],
+
   ['rag-day1-practice-01-llama-index', 'notebooks/rag/day1/01_llama_index.html'],
   ['rag-day1-practice-02-rag-app', 'notebooks/rag/day1/02_rag_app.html']
 ]);
@@ -149,7 +164,7 @@ function validateNotes(notes) {
   assertCheck(notes.some((note) => /language/.test(note.path)), 'manifest includes Language notes');
   assertCheck(notes.some((note) => /vision/.test(note.path)), 'manifest includes Vision notes');
   assertCheck(notes.some((note) => /rag\//.test(note.path)), 'manifest includes RAG notes');
-  assertCheck(notes.filter((note) => note.kind === 'notebook').length === 7, 'manifest includes seven notebook practice entries');
+  assertCheck(notes.filter((note) => note.kind === 'notebook').length === 21, 'manifest includes twenty-one notebook practice entries');
   for (const [id, htmlPath] of EXPECTED_NOTEBOOKS) {
     const note = notes.find((item) => item.id === id);
     assertCheck(Boolean(note), `expected notebook entry exists: ${id}`);
