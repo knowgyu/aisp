@@ -2,3 +2,6 @@
 vision/
 # Local-only LLM hands-on materials
 llm_hands_on/
+
+*.xlsx
+*.bz2
