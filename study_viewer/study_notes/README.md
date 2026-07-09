@@ -50,3 +50,11 @@ Vision 05+ generative material은 이번 시험 준비 public viewer 범위에�
 | 06+ | [LoRA Fine-tuning](language/06_lora_finetuning_deep_review.md) | `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb` |
 | 07 | [Instruction Fine-tuning](language/07_instruction_finetuning_deep_review.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb` |
 | 07+ | [DPO — optional](language/07_dpo_deep_review.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb` |
+
+## RAG — Day 1
+
+| 순서 | 복습 노트 / 실습 가이드 | 원본 |
+|---:|---|---|
+| 01 | [RAG Day 1 Lecture Review](rag/day1/01_rag_day1_lecture_review.md) | `rag/1일차/` PDF/HTML 자료 |
+| Practice 01 | [LlamaIndex Query Engine](rag/practice/01_llama_index_practice_guide.md) | `rag/1일차/실습 자료/Code/1. Llama_index.ipynb` |
+| Practice 02 | [RAG App Configuration](rag/practice/02_rag_practice_guide.md) | `rag/1일차/실습 자료/Code/2. RAG.ipynb` |

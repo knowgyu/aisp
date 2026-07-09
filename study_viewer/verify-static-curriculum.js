@@ -18,7 +18,9 @@ const EXPECTED_NOTEBOOKS = new Map([
   ['on-device-practice-02-quantization-cnn', 'notebooks/on_device_ai/02_quantization_cnn.html'],
   ['on-device-practice-03-knowledge-distillation', 'notebooks/on_device_ai/03_knowledge_distillation.html'],
   ['on-device-practice-04-pruning-llm', 'notebooks/on_device_ai/04_pruning_llm.html'],
-  ['on-device-practice-05-quantization-llm', 'notebooks/on_device_ai/05_quantization_llm.html']
+  ['on-device-practice-05-quantization-llm', 'notebooks/on_device_ai/05_quantization_llm.html'],
+  ['rag-day1-practice-01-llama-index', 'notebooks/rag/day1/01_llama_index.html'],
+  ['rag-day1-practice-02-rag-app', 'notebooks/rag/day1/02_rag_app.html']
 ]);
 let failures = 0;
 
@@ -146,7 +148,8 @@ function validateNotes(notes) {
   assertCheck(notes.some((note) => /on_device_ai/.test(note.path)), 'manifest includes On-Device AI notes');
   assertCheck(notes.some((note) => /language/.test(note.path)), 'manifest includes Language notes');
   assertCheck(notes.some((note) => /vision/.test(note.path)), 'manifest includes Vision notes');
-  assertCheck(notes.filter((note) => note.kind === 'notebook').length === 5, 'manifest includes exactly five notebook practice entries');
+  assertCheck(notes.some((note) => /rag\//.test(note.path)), 'manifest includes RAG notes');
+  assertCheck(notes.filter((note) => note.kind === 'notebook').length === 7, 'manifest includes seven notebook practice entries');
   for (const [id, htmlPath] of EXPECTED_NOTEBOOKS) {
     const note = notes.find((item) => item.id === id);
     assertCheck(Boolean(note), `expected notebook entry exists: ${id}`);

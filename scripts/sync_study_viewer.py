@@ -35,6 +35,10 @@ NOTES = [
   {"id":"study-notes-language-06-lora-finetuning-deep-review","title":"LLM 06+. LoRA Fine-tuning 깊은 복습","section":"Language / LLM","path":"study_notes/language/06_lora_finetuning_deep_review.md"},
   {"id":"study-notes-language-07-instruction-finetuning-deep-review","title":"LLM 07. Instruction Fine-tuning 깊은 복습","section":"Language / LLM","path":"study_notes/language/07_instruction_finetuning_deep_review.md"},
   {"id":"study-notes-language-07-dpo-deep-review","title":"LLM 07+. DPO 깊은 복습 (Optional)","section":"Language / LLM / Optional","path":"study_notes/language/07_dpo_deep_review.md"},
+
+{"id":"study-notes-rag-day1-lecture-review","title":"RAG Day 1. Retrieval-Augmented Generation 깊은 복습","section":"RAG / Day 1","path":"study_notes/rag/day1/01_rag_day1_lecture_review.md"},
+{"id":"rag-day1-practice-01-llama-index","kind":"notebook","title":"RAG Practice 01. LlamaIndex Query Engine 코드 학습","section":"RAG / Day 1 Practice","path":"study_notes/rag/practice/01_llama_index_practice_guide.md","notebookHtml":"notebooks/rag/day1/01_llama_index.html","sourceIpynb":"rag/1일차/실습 자료/Code/1. Llama_index.ipynb"},
+{"id":"rag-day1-practice-02-rag-app","kind":"notebook","title":"RAG Practice 02. RAG App 구성 코드 학습","section":"RAG / Day 1 Practice","path":"study_notes/rag/practice/02_rag_practice_guide.md","notebookHtml":"notebooks/rag/day1/02_rag_app.html","sourceIpynb":"rag/1일차/실습 자료/Code/2. RAG.ipynb"},
 ]
 
 DENIED = [
