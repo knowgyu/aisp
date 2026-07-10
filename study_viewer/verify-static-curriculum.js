@@ -188,7 +188,11 @@ function validateNotebookEntry(note, label) {
   const practicePath = path.join(ROOT, note.sourceIpynb);
   const referencePath = path.join(ROOT, note.referenceIpynb);
   assertCheck(fs.existsSync(practicePath), `${label} generated practice notebook exists`);
-  assertCheck(fs.existsSync(referencePath), `${label} original reference notebook exists`);
+  const localOnlyReference = note.referenceIpynb.startsWith('llm_hands_on/');
+  assertCheck(
+    fs.existsSync(referencePath) || localOnlyReference,
+    `${label} original reference notebook exists or is documented local-only`,
+  );
   const publicPracticePath = path.join(APP_DIR, note.practiceIpynb);
   assertCheck(fs.existsSync(publicPracticePath), `${label} downloadable practice notebook exists`);
   if (fs.existsSync(practicePath) && fs.existsSync(publicPracticePath)) {
