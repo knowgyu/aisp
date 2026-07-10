@@ -29,9 +29,13 @@ function loadPlaywright() {
     const layout = page.locator('.notebook-layout');
     const guide = page.locator('.notebook-guide');
     const iframe = page.locator('iframe.notebook-iframe');
+    const downloadLink = page.locator('.notebook-frame-head a[download]');
     await layout.waitFor({ state: 'visible', timeout: 15000 });
     await guide.waitFor({ state: 'visible', timeout: 15000 });
     await iframe.waitFor({ state: 'visible', timeout: 15000 });
+    await downloadLink.waitFor({ state: 'visible', timeout: 15000 });
+    const downloadHref = await downloadLink.getAttribute('href');
+    if (!downloadHref || !downloadHref.endsWith('.ipynb')) throw new Error(`practice notebook download link missing: ${downloadHref}`);
 
     const guideBox = await guide.boundingBox();
     const iframeBox = await iframe.boundingBox();
@@ -63,6 +67,19 @@ function loadPlaywright() {
  await frame.locator('mjx-container').first().waitFor({ state: 'visible', timeout: 20000 });
  const text = await frame.locator('body').innerText({ timeout: 15000 });
  if (!/Pruning for CNN|Assignment 1/i.test(text)) throw new Error('notebook body text missing expected title');
+ if (!/## 정답 입력/.test(text)) throw new Error('exam-practice answer-input marker missing');
+
+    await page.goto(`${baseUrl}#rag-day2-practice-01-mcp-evaluation`, { waitUntil: 'networkidle' });
+    const ragTitle = await page.locator('#note-title').innerText({ timeout: 15000 });
+    if (!/MCP 기반 평가와 업그레이드/.test(ragTitle)) throw new Error(`unexpected RAG Day 2 title: ${ragTitle}`);
+    const ragIframe = page.locator('iframe.notebook-iframe');
+    await ragIframe.waitFor({ state: 'visible', timeout: 15000 });
+    const ragHandle = await ragIframe.elementHandle();
+    const ragFrame = ragHandle ? await ragHandle.contentFrame() : null;
+    if (!ragFrame) throw new Error('RAG Day 2 MCP notebook frame not found');
+    await ragFrame.locator('.nb-cell').first().waitFor({ state: 'visible', timeout: 15000 });
+    const ragText = await ragFrame.locator('body').innerText({ timeout: 15000 });
+    if (!/## 정답 입력/.test(ragText)) throw new Error('RAG Day 2 practice drill missing');
 
     console.log('RESULT PASS browser split-view smoke');
     console.log(JSON.stringify({ guideBox, iframeBox, containerBox, sandbox }));

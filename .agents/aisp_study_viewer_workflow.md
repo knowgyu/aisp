@@ -62,19 +62,21 @@ manifest 항목은 두 종류다.
 ## 3. ipynb 처리 규칙
 
 1. 원본 ipynb는 그대로 둔다.
-2. 왼쪽 가이드는 `study_notes/<topic>/practice/*.md`에 만든다.
-3. 오른쪽 노트북 HTML은 다음처럼 생성한다.
+2. 시험 대비 실습본은 `python scripts/generate_exam_practice.py`로 `practice_notebooks/`에 생성한다. 핵심 코드 셀은 `## 정답 입력`으로 교체되고, 과목별 정답·해설은 `study_notes/exam_answers/`에 생성된다.
+3. 왼쪽 가이드는 `study_notes/<topic>/practice/*.md`에 만든다.
+4. 오른쪽 노트북 HTML은 다음처럼 생성한다.
 
 ```bash
 python scripts/convert_ipynb_static.py \
-  "rag/1일차/실습 자료/Code/1. Llama_index.ipynb" \
+  "practice_notebooks/rag/day1/01-llama-index.ipynb" \
   "study_viewer/notebooks/rag/day1/01_llama_index.html" \
   "RAG Practice 01. LlamaIndex Query Engine"
 ```
 
-4. 변환 HTML에는 MathJax만 허용된 script로 들어간다. iframe sandbox는 `allow-scripts`만 허용하며 `allow-same-origin`은 넣지 않는다.
-5. 실습 가이드는 셀 번호별로 “무엇을 보는지 / 핵심 객체 / shape 또는 데이터 구조 / 실수 포인트”를 적는다.
-6. API key가 들어가는 셀은 실행 안내보다 보안 주의와 환경변수 사용을 먼저 적는다.
+5. build는 실습 `.ipynb`도 `study_viewer/notebooks/`에 복사해 웹에서 내려받아 직접 채울 수 있게 한다.
+6. 변환 HTML에는 MathJax만 허용된 script로 들어간다. iframe sandbox는 `allow-scripts`만 허용하며 `allow-same-origin`은 넣지 않는다.
+7. 실습 가이드는 셀 번호별로 “무엇을 보는지 / 핵심 객체 / shape 또는 데이터 구조 / 실수 포인트”를 적는다.
+8. API key가 들어가는 셀은 실행 안내보다 보안 주의와 환경변수 사용을 먼저 적는다.
 
 ## 4. 교안 Markdown 작성 스타일
 

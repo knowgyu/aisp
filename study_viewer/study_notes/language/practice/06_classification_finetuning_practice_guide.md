@@ -1,5 +1,10 @@
 # LLM Practice 06. Classification Fine-tuning 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/language_code_answers.md`에서 확인합니다.
+
+
 - 대상 원본: `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification.ipynb`
 - 목표: 사전학습 GPT를 spam/ham 같은 분류 문제로 바꾸기 위해 마지막 token representation과 classification head를 fine-tuning하는 흐름을 이해한다.
 

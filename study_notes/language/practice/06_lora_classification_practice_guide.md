@@ -1,5 +1,10 @@
 # LLM Practice 06+. LoRA Classification Fine-tuning 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/language_code_answers.md`에서 확인합니다.
+
+
 - 대상 원본: `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb`
 - 목표: 기존 weight를 고정하고 low-rank adapter A/B만 학습해 분류 fine-tuning 비용을 줄이는 LoRA 구조를 이해한다.
 

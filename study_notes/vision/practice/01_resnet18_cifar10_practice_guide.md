@@ -1,5 +1,10 @@
 # Vision Practice 01. ResNet18 CIFAR-10 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `vision/01_ResNet18_CIFAR10.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/vision_code_answers.md`에서 확인합니다.
+
+
 - 대상 원본: `vision/01_ResNet18_CIFAR10.ipynb`
 - 목표: CIFAR-10 입력을 ResNet18에 맞게 학습하고 activation, kernel, Grad-CAM, t-SNE, ONNX까지 CNN 실습 흐름을 이해한다.
 

@@ -54,7 +54,49 @@ NOTES = [
 {"id":"study-notes-rag-day1-lecture-review","title":"RAG Day 1. Retrieval-Augmented Generation 깊은 복습","section":"RAG / Day 1","path":"study_notes/rag/day1/01_rag_day1_lecture_review.md"},
 {"id":"rag-day1-practice-01-llama-index","kind":"notebook","title":"RAG Practice 01. LlamaIndex Query Engine 코드 학습","section":"RAG / Day 1 Practice","path":"study_notes/rag/practice/01_llama_index_practice_guide.md","notebookHtml":"notebooks/rag/day1/01_llama_index.html","sourceIpynb":"rag/1일차/실습 자료/Code/1. Llama_index.ipynb"},
 {"id":"rag-day1-practice-02-rag-app","kind":"notebook","title":"RAG Practice 02. RAG App 구성 코드 학습","section":"RAG / Day 1 Practice","path":"study_notes/rag/practice/02_rag_practice_guide.md","notebookHtml":"notebooks/rag/day1/02_rag_app.html","sourceIpynb":"rag/1일차/실습 자료/Code/2. RAG.ipynb"},
+{"id":"study-notes-rag-day2-mcp-review","title":"RAG Day 2-1. MCP와 Text2SQL 깊은 복습","section":"RAG / Day 2 / 1. MCP","path":"study_notes/rag/day2/01_mcp_text2sql_review.md"},
+{"id":"rag-day2-practice-01-mcp-evaluation","kind":"notebook","title":"RAG Day 2 Practice 01. MCP 기반 평가와 업그레이드","section":"RAG / Day 2 / 1. MCP Practice","path":"study_notes/rag/day2/practice/01_mcp_evaluation_practice_guide.md","notebookHtml":"notebooks/rag/day2/01_mcp_evaluation.html","sourceIpynb":"practice_notebooks/rag/day2/01_mcp_evaluation.ipynb","referenceIpynb":"rag/2일차/실습 자료/Code/4_RAG_framework_evaluation_with_MCP.ipynb"},
+{"id":"study-notes-rag-day2-graphrag-review","title":"RAG Day 2-2. GraphRAG와 CRAG 깊은 복습","section":"RAG / Day 2 / 2. GraphRAG","path":"study_notes/rag/day2/02_graphrag_crag_review.md"},
+{"id":"rag-day2-practice-02-data-preprocessing","kind":"notebook","title":"RAG Day 2 Practice 02. CRAG 데이터 전처리","section":"RAG / Day 2 / 2. GraphRAG Practice","path":"study_notes/rag/day2/practice/02_data_preprocessing_practice_guide.md","notebookHtml":"notebooks/rag/day2/02_data_preprocessing.html","sourceIpynb":"practice_notebooks/rag/day2/02_data_preprocessing.ipynb","referenceIpynb":"rag/2일차/실습 자료/Code/1. Data_preprocessing.ipynb"},
+{"id":"rag-day2-practice-03-web-rag","kind":"notebook","title":"RAG Day 2 Practice 03. Web Retriever와 Reader","section":"RAG / Day 2 / 2. GraphRAG Practice","path":"study_notes/rag/day2/practice/03_web_rag_practice_guide.md","notebookHtml":"notebooks/rag/day2/03_web_rag.html","sourceIpynb":"practice_notebooks/rag/day2/03_web_rag.ipynb","referenceIpynb":"rag/2일차/실습 자료/Code/2. Task_1.ipynb"},
+{"id":"rag-day2-practice-04-kg-rag","kind":"notebook","title":"RAG Day 2 Practice 04. Knowledge Graph RAG","section":"RAG / Day 2 / 2. GraphRAG Practice","path":"study_notes/rag/day2/practice/04_kg_rag_practice_guide.md","notebookHtml":"notebooks/rag/day2/04_kg_rag.html","sourceIpynb":"practice_notebooks/rag/day2/04_kg_rag.ipynb","referenceIpynb":"rag/2일차/실습 자료/Code/3. Task_2.ipynb"},
+{"id":"exam-solutions-vision","title":"Vision 코드 실습 정답·해설지","section":"Exam Practice / Solutions","path":"study_notes/exam_answers/vision_code_answers.md"},
+{"id":"exam-solutions-language","title":"Language / LLM 코드 실습 정답·해설지","section":"Exam Practice / Solutions","path":"study_notes/exam_answers/language_code_answers.md"},
+{"id":"exam-solutions-on-device-ai","title":"On-Device AI 코드 실습 정답·해설지","section":"Exam Practice / Solutions","path":"study_notes/exam_answers/on_device_ai_code_answers.md"},
+{"id":"exam-solutions-rag","title":"RAG 코드 실습 정답·해설지","section":"Exam Practice / Solutions","path":"study_notes/exam_answers/rag_code_answers.md"},
 ]
+
+PRACTICE_NOTEBOOK_SOURCES = {
+  "on-device-practice-01-pruning-cnn": "practice_notebooks/on_device_ai/01-pruning-cnn.ipynb",
+  "on-device-practice-02-quantization-cnn": "practice_notebooks/on_device_ai/02-quantization-cnn.ipynb",
+  "on-device-practice-03-knowledge-distillation": "practice_notebooks/on_device_ai/03-knowledge-distillation.ipynb",
+  "on-device-practice-04-pruning-llm": "practice_notebooks/on_device_ai/04-pruning-llm.ipynb",
+  "on-device-practice-05-quantization-llm": "practice_notebooks/on_device_ai/05-quantization-llm.ipynb",
+  "vision-practice-01-resnet18-cifar10": "practice_notebooks/vision/01-resnet18-cifar10.ipynb",
+  "vision-practice-02-vit-cifar10": "practice_notebooks/vision/02-vit-cifar10.ipynb",
+  "vision-practice-03-detr": "practice_notebooks/vision/03-detr.ipynb",
+  "vision-practice-04-unet": "practice_notebooks/vision/04-unet.ipynb",
+  "llm-practice-01-vector-space": "practice_notebooks/language/01-vector-space.ipynb",
+  "llm-practice-02-dataset": "practice_notebooks/language/02-dataset.ipynb",
+  "llm-practice-03-attention": "practice_notebooks/language/03-attention.ipynb",
+  "llm-practice-03-attention-visualization": "practice_notebooks/language/03-attention-visualization.ipynb",
+  "llm-practice-04-gpt": "practice_notebooks/language/04-gpt.ipynb",
+  "llm-practice-05-pretraining": "practice_notebooks/language/05-pretraining.ipynb",
+  "llm-practice-06-classification-finetuning": "practice_notebooks/language/06-classification-finetuning.ipynb",
+  "llm-practice-06-lora-classification": "practice_notebooks/language/06-lora-classification.ipynb",
+  "llm-practice-07-instruction-finetuning": "practice_notebooks/language/07-instruction-finetuning.ipynb",
+  "llm-practice-07-dpo": "practice_notebooks/language/07-dpo.ipynb",
+  "rag-day1-practice-01-llama-index": "practice_notebooks/rag/day1/01-llama-index.ipynb",
+  "rag-day1-practice-02-rag-app": "practice_notebooks/rag/day1/02-rag-app.ipynb",
+}
+
+for note in NOTES:
+    practice_source = PRACTICE_NOTEBOOK_SOURCES.get(note["id"])
+    if practice_source:
+        note["referenceIpynb"] = note["sourceIpynb"]
+        note["sourceIpynb"] = practice_source
+    if note.get("kind") == "notebook":
+        note["practiceIpynb"] = note["notebookHtml"].removesuffix(".html") + ".ipynb"
 
 DENIED = [
   'study_notes/on_device_ai/ch01_pdf_extracted_text.md',

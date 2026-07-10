@@ -1,5 +1,10 @@
 # On-Device AI Practice 03 — Knowledge Distillation 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `On-Device AI 강의자료/실습/3. Knowledge Distillation.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/on_device_ai_code_answers.md`에서 확인합니다.
+
+
 > 오른쪽 원본 노트북 `3. Knowledge Distillation.ipynb`를 보면서, 왼쪽에서는 teacher/student 학습 흐름과 loss가 어디서 계산되는지 따라가면 된다.
 
 - 기준 교안: `ODAI-1 Chapter 4. Knowledge Distillation`

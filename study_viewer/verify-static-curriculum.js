@@ -35,7 +35,11 @@ const EXPECTED_NOTEBOOKS = new Map([
   ['llm-practice-07-dpo', 'notebooks/language/07_dpo.html'],
 
   ['rag-day1-practice-01-llama-index', 'notebooks/rag/day1/01_llama_index.html'],
-  ['rag-day1-practice-02-rag-app', 'notebooks/rag/day1/02_rag_app.html']
+  ['rag-day1-practice-02-rag-app', 'notebooks/rag/day1/02_rag_app.html'],
+  ['rag-day2-practice-01-mcp-evaluation', 'notebooks/rag/day2/01_mcp_evaluation.html'],
+  ['rag-day2-practice-02-data-preprocessing', 'notebooks/rag/day2/02_data_preprocessing.html'],
+  ['rag-day2-practice-03-web-rag', 'notebooks/rag/day2/03_web_rag.html'],
+  ['rag-day2-practice-04-kg-rag', 'notebooks/rag/day2/04_kg_rag.html']
 ]);
 let failures = 0;
 
@@ -118,7 +122,7 @@ function loadManifest() {
   }
   const notes = context.window.AI_STUDY_NOTES;
   assertCheck(Array.isArray(notes), 'window.AI_STUDY_NOTES is an array');
-  assertCheck(notes.length >= 25, 'manifest includes the expanded study note set');
+  assertCheck(notes.length >= 50, 'manifest includes the expanded study note set');
   return Array.isArray(notes) ? notes : [];
 }
 
@@ -164,20 +168,38 @@ function validateNotes(notes) {
   assertCheck(notes.some((note) => /language/.test(note.path)), 'manifest includes Language notes');
   assertCheck(notes.some((note) => /vision/.test(note.path)), 'manifest includes Vision notes');
   assertCheck(notes.some((note) => /rag\//.test(note.path)), 'manifest includes RAG notes');
-  assertCheck(notes.filter((note) => note.kind === 'notebook').length === 21, 'manifest includes twenty-one notebook practice entries');
+  assertCheck(notes.filter((note) => note.kind === 'notebook').length === 25, 'manifest includes twenty-five notebook practice entries');
   for (const [id, htmlPath] of EXPECTED_NOTEBOOKS) {
     const note = notes.find((item) => item.id === id);
     assertCheck(Boolean(note), `expected notebook entry exists: ${id}`);
     if (note) assertCheck(note.notebookHtml === htmlPath, `${id} maps to expected notebook HTML`);
   }
-  assertCheck(!notes.some((note) => /answer|colab/i.test(`${note.path} ${note.notebookHtml || ''} ${note.sourceIpynb || ''}`)), 'manifest excludes answer/colab variants');
+  assertCheck(!notes.some((note) => note.kind === 'notebook' && /answer|colab/i.test(`${note.notebookHtml || ''} ${note.sourceIpynb || ''}`)), 'notebook manifest excludes answer/colab notebook variants');
+  assertCheck(notes.filter((note) => /^exam-solutions-/.test(note.id)).length === 4, 'manifest includes four subject answer guides');
   assertCheck(!notes.some((note) => /05_|06_|DDPM|Stable|Generative/i.test(`${note.path} ${note.title}`) && /vision/i.test(note.path)), 'manifest excludes Vision 05+ generative material');
 }
 
 function validateNotebookEntry(note, label) {
   assertCheck(note.kind === 'notebook', `${label} has kind notebook`);
   assertCheck(typeof note.notebookHtml === 'string' && note.notebookHtml.startsWith('notebooks/'), `${label} notebookHtml stays under notebooks/`);
-  assertCheck(typeof note.sourceIpynb === 'string' && note.sourceIpynb.endsWith('.ipynb'), `${label} sourceIpynb records original notebook`);
+  assertCheck(typeof note.sourceIpynb === 'string' && note.sourceIpynb.startsWith('practice_notebooks/') && note.sourceIpynb.endsWith('.ipynb'), `${label} sourceIpynb records generated practice notebook`);
+  assertCheck(typeof note.practiceIpynb === 'string' && note.practiceIpynb.startsWith('notebooks/') && note.practiceIpynb.endsWith('.ipynb'), `${label} practiceIpynb stays under public notebooks`);
+  assertCheck(typeof note.referenceIpynb === 'string' && note.referenceIpynb.endsWith('.ipynb'), `${label} referenceIpynb records untouched original notebook`);
+  const practicePath = path.join(ROOT, note.sourceIpynb);
+  const referencePath = path.join(ROOT, note.referenceIpynb);
+  assertCheck(fs.existsSync(practicePath), `${label} generated practice notebook exists`);
+  assertCheck(fs.existsSync(referencePath), `${label} original reference notebook exists`);
+  const publicPracticePath = path.join(APP_DIR, note.practiceIpynb);
+  assertCheck(fs.existsSync(publicPracticePath), `${label} downloadable practice notebook exists`);
+  if (fs.existsSync(practicePath) && fs.existsSync(publicPracticePath)) {
+    assertCheck(fs.readFileSync(practicePath).equals(fs.readFileSync(publicPracticePath)), `${label} downloadable practice notebook matches generated source`);
+  }
+  if (fs.existsSync(practicePath)) {
+    const practice = JSON.parse(fs.readFileSync(practicePath, 'utf8'));
+    const practiceCells = Array.isArray(practice.cells) ? practice.cells : [];
+    assertCheck(Boolean(practice.metadata && practice.metadata.aisp_exam_practice), `${label} practice notebook records generation metadata`);
+    assertCheck(practiceCells.some((cell) => /## 정답 입력/.test(Array.isArray(cell.source) ? cell.source.join('') : String(cell.source || ''))), `${label} practice notebook includes answer-input drills`);
+  }
   const sourceGuidePath = path.join(ROOT, note.path);
   const publicGuidePath = path.join(APP_DIR, note.path);
   assertCheck(fs.existsSync(sourceGuidePath), `${label} source guide exists`);
@@ -202,6 +224,7 @@ function validateNotebookEntry(note, label) {
   assertCheck(!/javascript\s*:/i.test(htmlWithoutAllowedMathJax), `${label} notebook HTML has no javascript URLs`);
   assertCheck(/nb-cell/.test(htmlText), `${label} notebook HTML contains notebook cells`);
   assertCheck(/nb-code/.test(htmlText), `${label} notebook HTML contains code cells`);
+  assertCheck(/## 정답 입력/.test(htmlText), `${label} notebook HTML exposes answer-input drills`);
   assertCheck(/Code Cell \d{3}/.test(htmlText), `${label} notebook HTML labels code cells by cell number`);
   assertCheck(/nb-code-line/.test(htmlText) && /nb-lineno/.test(htmlText), `${label} notebook HTML renders code line numbers`);
   assertCheck(!/In \[/.test(htmlText), `${label} notebook HTML omits old Jupyter In prompt labels`);

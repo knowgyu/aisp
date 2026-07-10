@@ -7,6 +7,7 @@ notebooks whose source ipynb and converter are older than the generated HTML.
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,7 @@ import sync_study_viewer
 ROOT = Path(__file__).resolve().parents[1]
 CONVERTER = ROOT / 'scripts' / 'convert_ipynb_static.py'
 VERIFY = ROOT / 'study_viewer' / 'verify-static-curriculum.js'
+PRACTICE_GENERATOR = ROOT / 'scripts' / 'generate_exam_practice.py'
 
 
 def notebook_entries():
@@ -48,6 +50,19 @@ def convert_notebooks(*, force: bool = False) -> dict[str, int]:
     return stats
 
 
+def copy_practice_notebooks() -> int:
+    copied = 0
+    for note in notebook_entries():
+        src = ROOT / note['sourceIpynb']
+        out = ROOT / 'study_viewer' / note['practiceIpynb']
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if out.exists() and out.read_bytes() == src.read_bytes():
+            continue
+        shutil.copy2(src, out)
+        copied += 1
+    return copied
+
+
 def run_verify() -> None:
     subprocess.run(['node', str(VERIFY)], cwd=ROOT, check=True)
 
@@ -58,12 +73,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--verify', action='store_true', help='run the static curriculum verifier after build')
     args = parser.parse_args(argv)
 
+    subprocess.run([sys.executable, str(PRACTICE_GENERATOR)], cwd=ROOT, check=True)
     converted = convert_notebooks(force=args.force)
+    copied_notebooks = copy_practice_notebooks()
     copied = sync_study_viewer.copy_allowed()
     manifest_changed = sync_study_viewer.write_manifest()
     print(
         'build study_viewer: '
         f"converted={converted['converted']} skipped={converted['skipped']} "
+        f"practice_ipynb_copied={copied_notebooks} "
         f"copied={copied['copied']} removed={copied['removed']} "
         f"manifest_changed={int(manifest_changed)}",
         flush=True,

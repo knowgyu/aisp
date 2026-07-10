@@ -1,5 +1,10 @@
 # LLM Practice 01. Vector Space / Word Embedding 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `llm_hands_on/Chapter_1_Exercise_Vector Space.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/language_code_answers.md`에서 확인합니다.
+
+
 - 대상 원본: `llm_hands_on/Chapter_1_Exercise_Vector Space.ipynb`
 - 목표: 사전학습 단어 벡터를 불러와 유사도, analogy, nearest neighbors가 벡터 연산으로 동작한다는 점을 확인한다.
 

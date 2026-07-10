@@ -1,5 +1,10 @@
 # RAG Practice 02. RAG App 구성 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `rag/1일차/실습 자료/Code/2. RAG.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/rag_code_answers.md`에서 확인합니다.
+
+
 오른쪽 원본 노트북 `2. RAG.ipynb`를 보면서, 왼쪽에서는 기본 LLM의 한계 → Wikipedia 기반 RAG 구축 → chunk/top-k/prompt 설정 비교 흐름을 잡는다.
 
 기준 자료: `rag/1일차/실습 자료/Code/2. RAG.ipynb`

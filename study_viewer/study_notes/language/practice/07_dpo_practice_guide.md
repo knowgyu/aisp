@@ -1,5 +1,10 @@
 # LLM Practice 07+. DPO 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/language_code_answers.md`에서 확인합니다.
+
+
 - 대상 원본: `llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb`
 - 목표: chosen/rejected 응답 쌍으로 reference model 대비 policy model의 선호도를 직접 최적화하는 DPO 흐름을 이해한다.
 

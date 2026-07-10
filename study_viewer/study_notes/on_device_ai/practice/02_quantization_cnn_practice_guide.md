@@ -1,5 +1,10 @@
 # On-Device AI Practice 02 — Quantization for CNN 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `On-Device AI 강의자료/실습/2. Quantization for CNN.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/on_device_ai_code_answers.md`에서 확인합니다.
+
+
 > 오른쪽 원본 노트북 `2. Quantization for CNN.ipynb`를 띄워두고, 왼쪽에서는 아래 셀 번호를 따라가면 된다. 이 가이드는 **CNN 양자화 전용**으로 작성되어 있으며, LLM/KD/pruning 설명을 섞지 않는다.
 
 - 기준 교안: `ODAI-1 Chapter 3. Quantization`

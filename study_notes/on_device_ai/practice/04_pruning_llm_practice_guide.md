@@ -1,5 +1,10 @@
 # On-Device AI Practice 04 — Pruning for LLM 코드 학습 가이드
 
+<!-- aisp-exam-practice-notice -->
+> **시험 대비 모드:** 오른쪽에는 원본 전체 코드 대신 핵심 셀을 `## 정답 입력`으로 비운 실습본이 표시됩니다.
+> 원본은 `On-Device AI 강의자료/실습/4. Pruning for LLM.ipynb`, 정답과 출제 의도는 `study_notes/exam_answers/on_device_ai_code_answers.md`에서 확인합니다.
+
+
 > 오른쪽 원본 노트북 `4. Pruning for LLM.ipynb`를 보면서, 왼쪽에서는 LLM pruning이 CNN pruning과 어떻게 다른지 집중해서 보면 된다.
 
 - 기준 교안: `ODAI-2 Chapter 1. LLM Pruning`

@@ -16,7 +16,7 @@
 
 ## On-Device AI — Practice notebooks
 
-웹 viewer에서는 아래 가이드와 원본 노트북 HTML이 split view로 동시에 표시됩니다.
+웹 viewer에서는 아래 가이드와 핵심 셀을 `## 정답 입력`으로 비운 시험 대비 노트북 HTML이 split view로 동시에 표시됩니다. 원본은 변경하지 않습니다.
 
 | 순서 | 실습 가이드 | 원본 notebook |
 |---:|---|---|
@@ -59,6 +59,26 @@ Vision 05+ generative material은 이번 시험 준비 public viewer 범위에�
 | Practice 01 | [LlamaIndex Query Engine](rag/practice/01_llama_index_practice_guide.md) | `rag/1일차/실습 자료/Code/1. Llama_index.ipynb` |
 | Practice 02 | [RAG App Configuration](rag/practice/02_rag_practice_guide.md) | `rag/1일차/실습 자료/Code/2. RAG.ipynb` |
 
+## RAG — Day 2 (MCP → GraphRAG)
+
+| 순서 | 복습 노트 / 실습 가이드 | 원본 |
+|---:|---|---|
+| 01 | [MCP와 Text2SQL 깊은 복습](rag/day2/01_mcp_text2sql_review.md) | `rag/2일차/NL2SQL___mcp.pdf` |
+| Practice 01 | [MCP 기반 평가와 업그레이드](rag/day2/practice/01_mcp_evaluation_practice_guide.md) | `4_RAG_framework_evaluation_with_MCP.ipynb` |
+| 02 | [GraphRAG와 CRAG 깊은 복습](rag/day2/02_graphrag_crag_review.md) | `Graph_RAG.pdf`, Graph RAG 실습 PDF |
+| Practice 02 | [CRAG 데이터 전처리](rag/day2/practice/02_data_preprocessing_practice_guide.md) | `1. Data_preprocessing.ipynb` |
+| Practice 03 | [Web Retriever와 Reader](rag/day2/practice/03_web_rag_practice_guide.md) | `2. Task_1.ipynb` |
+| Practice 04 | [Knowledge Graph RAG](rag/day2/practice/04_kg_rag_practice_guide.md) | `3. Task_2.ipynb` |
+
+## 4과목 코드 실습 정답·해설
+
+- [Vision 정답·해설](exam_answers/vision_code_answers.md)
+- [Language / LLM 정답·해설](exam_answers/language_code_answers.md)
+- [On-Device AI 정답·해설](exam_answers/on_device_ai_code_answers.md)
+- [RAG 정답·해설](exam_answers/rag_code_answers.md)
+
+실습본은 `practice_notebooks/`에 생성되며, `python scripts/generate_exam_practice.py`로 원본에서 다시 만들 수 있습니다.
+
 ## Vision — Notebook practice guides
 
 | 순서 | 실습 가이드 | 원본 notebook |
@@ -84,4 +104,3 @@ Vision 05+ generative material은 이번 시험 준비 public viewer 범위에�
 | Practice 06+ | [LoRA Classification 코드 학습](language/practice/06_lora_classification_practice_guide.md) | `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb` |
 | Practice 07 | [Instruction Fine-tuning 코드 학습](language/practice/07_instruction_finetuning_practice_guide.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb` |
 | Practice 07+ | [DPO 코드 학습](language/practice/07_dpo_practice_guide.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb` |
-
