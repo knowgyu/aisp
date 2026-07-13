@@ -185,7 +185,8 @@ function validateNotebookEntry(note, label) {
   assertCheck(typeof note.sourceIpynb === 'string' && note.sourceIpynb.endsWith('.ipynb') && !note.sourceIpynb.startsWith('practice_notebooks/'), `${label} sourceIpynb records original notebook`);
   assertCheck(typeof note.practiceIpynb === 'string' && note.practiceIpynb.startsWith('notebooks/') && note.practiceIpynb.endsWith('.ipynb'), `${label} practiceIpynb stays under public notebooks`);
   const practicePath = path.join(ROOT, note.sourceIpynb);
-  assertCheck(fs.existsSync(practicePath), `${label} original notebook exists`);
+  const localOnlySource = note.sourceIpynb.startsWith('llm_hands_on/');
+  assertCheck(fs.existsSync(practicePath) || localOnlySource, `${label} original notebook exists or is bundled in public artifact`);
   const publicPracticePath = path.join(APP_DIR, note.practiceIpynb);
   assertCheck(fs.existsSync(publicPracticePath), `${label} downloadable practice notebook exists`);
   if (fs.existsSync(practicePath) && fs.existsSync(publicPracticePath)) {
