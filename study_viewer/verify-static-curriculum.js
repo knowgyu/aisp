@@ -163,12 +163,15 @@ function validateNotes(notes) {
       assertCheck(fs.existsSync(imagePath), `${label} image exists: ${ref}`);
     }
     if (note.kind === 'notebook') validateNotebookEntry(note, label);
+    for (const publicFile of note.publicFiles || []) {
+      assertCheck(fs.existsSync(path.join(APP_DIR, publicFile)), `${label} public file exists: ${publicFile}`);
+    }
   }
   assertCheck(notes.some((note) => /on_device_ai/.test(note.path)), 'manifest includes On-Device AI notes');
   assertCheck(notes.some((note) => /language/.test(note.path)), 'manifest includes Language notes');
   assertCheck(notes.some((note) => /vision/.test(note.path)), 'manifest includes Vision notes');
   assertCheck(notes.some((note) => /rag\//.test(note.path)), 'manifest includes RAG notes');
-  assertCheck(notes.filter((note) => note.kind === 'notebook').length === 25, 'manifest includes twenty-five notebook practice entries');
+  assertCheck(notes.filter((note) => note.kind === 'notebook').length === 30, 'manifest includes thirty notebook practice entries');
   for (const [id, htmlPath] of EXPECTED_NOTEBOOKS) {
     const note = notes.find((item) => item.id === id);
     assertCheck(Boolean(note), `expected notebook entry exists: ${id}`);

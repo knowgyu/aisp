@@ -64,6 +64,18 @@ NOTES = [
 {"id":"exam-solutions-language","title":"Language / LLM 코드 실습 정답·해설지","section":"Exam Practice / Solutions","path":"study_notes/exam_answers/language_code_answers.md"},
 {"id":"exam-solutions-on-device-ai","title":"On-Device AI 코드 실습 정답·해설지","section":"Exam Practice / Solutions","path":"study_notes/exam_answers/on_device_ai_code_answers.md"},
 {"id":"exam-solutions-rag","title":"RAG 코드 실습 정답·해설지","section":"Exam Practice / Solutions","path":"study_notes/exam_answers/rag_code_answers.md"},
+
+  {"id":"data-ts-basics","title":"Time Series 01. 기초 강의자료","section":"Data / Time Series","path":"study_notes/data/ts_basics.md","publicFiles":["data/1-ts-basics.pdf"]},
+  {"id":"data-ts-advanced","title":"Time Series 02. 심화 강의자료","section":"Data / Time Series","path":"study_notes/data/ts_advanced.md","publicFiles":["data/2-ts-advanced.pdf"]},
+  {"id":"data-ts-practice-pdf","title":"Time Series 03–04. 실습 강의자료","section":"Data / Time Series","path":"study_notes/data/ts_practice_material.md","publicFiles":["data/3_4-ts-practice.pdf"]},
+  {"id":"data-recsys-basics","title":"Recommender System 05. 기초 강의자료","section":"Data / Recommender System","path":"study_notes/data/recsys_basics.md","publicFiles":["data/5-recsys-basics.pdf"]},
+  {"id":"data-recsys-advanced","title":"Recommender System 06. 심화 강의자료","section":"Data / Recommender System","path":"study_notes/data/recsys_advanced.md","publicFiles":["data/6-recsys-advanced.pdf"]},
+  {"id":"data-recsys-practice-pdf","title":"Recommender System 07–08. 실습 강의자료","section":"Data / Recommender System","path":"study_notes/data/recsys_practice_material.md","publicFiles":["data/7_8-recsys-practice.pdf"]},
+  {"id":"data-ts-practice","kind":"notebook","title":"Time Series Practice. 실습 노트북","section":"Data / Time Series / Practice","path":"study_notes/data/ts_practice.md","notebookHtml":"notebooks/data/ts_practice.html","sourceIpynb":"data/3_4-ts-practice/ts_practice.ipynb"},
+  {"id":"data-ts-solution","kind":"notebook","title":"Time Series Practice. Solution 노트북","section":"Data / Time Series / Practice","path":"study_notes/data/ts_solution.md","notebookHtml":"notebooks/data/ts_solution.html","sourceIpynb":"data/3_4-ts-practice/ts_solution.ipynb"},
+  {"id":"data-recsys-gcf-practice","kind":"notebook","title":"Recommender System Practice. GCF 실습 노트북","section":"Data / Recommender System / Practice","path":"study_notes/data/recsys_gcf_practice.md","notebookHtml":"notebooks/data/recsys_gcf_practice.html","sourceIpynb":"data/7_8-recsys-practice/RecSys_GCF_practice.ipynb"},
+  {"id":"data-recsys-gcf-solution","kind":"notebook","title":"Recommender System Practice. GCF Solution 노트북","section":"Data / Recommender System / Practice","path":"study_notes/data/recsys_gcf_solution.md","notebookHtml":"notebooks/data/recsys_gcf_solution.html","sourceIpynb":"data/7_8-recsys-practice/RecSys_GCF_sol.ipynb"},
+  {"id":"data-recsys-ncf","kind":"notebook","title":"Recommender System Practice. NCF 노트북","section":"Data / Recommender System / Practice","path":"study_notes/data/recsys_ncf.md","notebookHtml":"notebooks/data/recsys_ncf.html","sourceIpynb":"data/7_8-recsys-practice/RecSys_NCF.ipynb"},
 ]
 
 PRACTICE_NOTEBOOK_SOURCES = {
@@ -172,6 +184,12 @@ def copy_allowed() -> dict[str, int]:
         allowed_public.add(dst.resolve())
         stats['copied'] += int(copy_file_if_changed(src, dst))
         stats['copied'] += copy_referenced_assets(rel, allowed_public)
+        for public_file in note.get('publicFiles', []):
+            source_file = ROOT / public_file
+            destination_file = ROOT / 'study_viewer' / public_file
+            if not source_file.exists():
+                raise FileNotFoundError(source_file)
+            stats['copied'] += int(copy_file_if_changed(source_file, destination_file))
 
     stats['removed'] += prune_unlisted_files(DST, allowed_public)
     stats['removed'] += prune_unlisted_files(ROOT / 'study_viewer' / 'llm_lecture2', allowed_public)
