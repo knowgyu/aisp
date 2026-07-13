@@ -8,6 +8,15 @@
 - 추천시스템: `data/5-recsys-basics.pdf`, `data/6-recsys-advanced.pdf`, `data/7_8-recsys-practice/RecSys_GCF_practice.ipynb`, `RecSys_NCF.ipynb`
 - 데이터: `data/7_8-recsys-practice/ml-latest-small/{ratings,movies,tags,links}.csv`
 
+## 강의자료 바로 열기
+
+- [Time Series 01. 기초 PDF](../../data/1-ts-basics.pdf)
+- [Time Series 02. 심화 PDF](../../data/2-ts-advanced.pdf)
+- [Time Series 03–04. 실습 PDF](../../data/3_4-ts-practice.pdf)
+- [Recommender System 05. 기초 PDF](../../data/5-recsys-basics.pdf)
+- [Recommender System 06. 심화 PDF](../../data/6-recsys-advanced.pdf)
+- [Recommender System 07–08. 실습 PDF](../../data/7_8-recsys-practice.pdf)
+
 ## 시험에서 구분할 두 문제
 
 | 축 | 시계열 예측 | 추천시스템 |

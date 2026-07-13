@@ -2,6 +2,29 @@
 
 이 폴더는 원본 강의자료/PDF/ipynb를 그대로 대체하지 않고, 시험 준비용으로 다시 읽기 쉽게 정리한 overlay 노트입니다.
 
+
+## 시험 직전 빠른 진입점
+
+- [Jupyter Skeleton Code 생존 체크리스트](jupyter_exam_quick_reference.md) — 실행 순서, shape, training/eval, 누수 점검
+- [Data 큰 그림·PDF 링크·출제 포인트](data/00_exam_data_overview.md)
+- [RAG Day 1 코드 동반 복습](rag/day1/02_rag_day1_code_companion.md)
+- [RAG Day 2 CRAG·KG·MCP 코드 동반 복습](rag/day2/03_crag_kg_mcp_notebook_companion.md)
+- [Time Series notebook 동반 복습](data/04_time_series_notebook_companion.md)
+- [Recommender notebook 동반 복습](data/05_recommender_notebook_companion.md)
+
+## 시험 Recap 학습 계획
+
+실습 빈칸을 풀기 전에 출제포인트와 원본 교안·노트북을 순서대로 복습하려면 [통합 Recap 계획](recap/00_master_recap_plan.md)부터 시작합니다.
+
+권장 순서는 **LLM → Vision → On-device AI → RAG**이며, 각 과목의 상세 파일은 다음과 같습니다.
+
+- [LLM Recap](recap/01_llm_recap_plan.md)
+- [Vision Recap](recap/02_vision_recap_plan.md)
+- [On-device AI Recap](recap/03_on_device_ai_recap_plan.md)
+- [RAG Recap](recap/04_rag_recap_plan.md)
+
+Data는 별도 교안/실습을 학습하기 전까지 보류합니다.
+
 ## On-Device AI — Lecture notes
 
 | 순서 | 복습 노트 | 원본 |
@@ -50,14 +73,6 @@ Vision 05+ generative material은 이번 시험 준비 public viewer 범위에�
 | 06+ | [LoRA Fine-tuning](language/06_lora_finetuning_deep_review.md) | `llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb` |
 | 07 | [Instruction Fine-tuning](language/07_instruction_finetuning_deep_review.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb` |
 | 07+ | [DPO — optional](language/07_dpo_deep_review.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb` |
-
-## Data — Exam focus companions
-
-원본 PDF와 notebook을 읽기 전에 shape·data flow·API·metric을 빠르게 점검합니다.
-
-- [Data 과목 시험 포커스](data/00_data_exam_focus.md)
-- [Time Series Notebook 시험 동반 노트](data/ts_notebook_exam_companion.md)
-- [Recommender Notebook 시험 동반 노트](data/recsys_notebook_exam_companion.md)
 
 ## RAG — Day 1
 

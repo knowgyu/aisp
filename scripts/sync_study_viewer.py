@@ -8,6 +8,12 @@ SRC = ROOT / 'study_notes'
 DST = ROOT / 'study_viewer' / 'study_notes'
 
 NOTES = [
+  {"id":"jupyter-exam-quick-reference","title":"시험 직전. Jupyter Skeleton Code 생존 체크리스트","section":"시험 직전 · 핵심 복습","path":"study_notes/jupyter_exam_quick_reference.md"},
+  {"id":"data-exam-overview","title":"Data. 큰 그림·PDF 링크·출제 포인트","section":"시험 직전 · 핵심 복습","path":"study_notes/data/00_exam_data_overview.md"},
+  {"id":"rag-day1-code-companion","title":"RAG Day 1. LlamaIndex 객체·흐름 코드 동반 복습","section":"시험 직전 · 핵심 복습","path":"study_notes/rag/day1/02_rag_day1_code_companion.md"},
+  {"id":"rag-day2-crag-mcp-companion","title":"RAG Day 2. CRAG·KG·MCP 코드 동반 복습","section":"시험 직전 · 핵심 복습","path":"study_notes/rag/day2/03_crag_kg_mcp_notebook_companion.md"},
+  {"id":"data-ts-notebook-companion","title":"Time Series 03–04. Shape·LSTM/RNN/CNN 코드 동반 복습","section":"시험 직전 · 핵심 복습","path":"study_notes/data/04_time_series_notebook_companion.md"},
+  {"id":"data-recsys-notebook-companion","title":"Recommender System 07–08. NCF·NGCF 코드 동반 복습","section":"시험 직전 · 핵심 복습","path":"study_notes/data/05_recommender_notebook_companion.md"},
   {"id":"study-notes-readme","title":"AISP 복습 노트 인덱스","section":"Overview","path":"study_notes/README.md"},
   {"id":"study-notes-on-device-ai-study-plan","title":"On-Device AI 시험 대비 학습 준비 문맥","section":"Overview","path":"study_notes/on_device_ai_study_plan.md"},
   {"id":"study-notes-on-device-ai-odai1-ch01-on-device-ai-key-points","title":"ODAI-1 Chapter 1. On-Device AI 핵심 정리","section":"On-Device AI / Lecture","path":"study_notes/on_device_ai/odai1_ch01_on_device_ai_key_points.md"},
@@ -66,11 +72,6 @@ NOTES = [
 {"id":"exam-solutions-rag","title":"RAG 코드 실습 정답·해설지","section":"Exam Practice / Solutions","path":"study_notes/exam_answers/rag_code_answers.md"},
 
   {"id":"data-ts-basics","title":"Time Series 01. 기초 강의자료","section":"Data / Time Series","path":"study_notes/data/ts_basics.md","publicFiles":["data/1-ts-basics.pdf"]},
-  {"id":"data-exam-overview","title":"AISP 데이터 과목. 시험 초점과 실습 지도","section":"Data / Exam Focus","path":"study_notes/data/00_exam_data_overview.md"},
-  {"id":"rag-day1-code-companion","title":"RAG Day 1. LlamaIndex 실습 코드 동반 복습","section":"RAG / Day 1 / Code Companion","path":"study_notes/rag/day1/02_rag_day1_code_companion.md"},
-  {"id":"rag-day2-mcp-code-companion","title":"RAG Day 2. MCP Text2SQL 코드 동반 복습","section":"RAG / Day 2 / MCP Code Companion","path":"study_notes/rag/day2/03_mcp_text2sql_code_companion.md"},
-  {"id":"data-ts-notebook-companion","title":"Time Series 03–04. Notebook 동반 복습","section":"Data / Time Series / Code Companion","path":"study_notes/data/04_time_series_notebook_companion.md"},
-  {"id":"data-recsys-notebook-companion","title":"Recommender System 07–08. Notebook 동반 복습","section":"Data / Recommender System / Code Companion","path":"study_notes/data/05_recommender_notebook_companion.md"},
   {"id":"data-ts-advanced","title":"Time Series 02. 심화 강의자료","section":"Data / Time Series","path":"study_notes/data/ts_advanced.md","publicFiles":["data/2-ts-advanced.pdf"]},
   {"id":"data-ts-practice-pdf","title":"Time Series 03–04. 실습 강의자료","section":"Data / Time Series","path":"study_notes/data/ts_practice_material.md","publicFiles":["data/3_4-ts-practice.pdf"]},
   {"id":"data-recsys-basics","title":"Recommender System 05. 기초 강의자료","section":"Data / Recommender System","path":"study_notes/data/recsys_basics.md","publicFiles":["data/5-recsys-basics.pdf"]},
