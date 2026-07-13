@@ -2,19 +2,6 @@
 
 이 폴더는 원본 강의자료/PDF/ipynb를 그대로 대체하지 않고, 시험 준비용으로 다시 읽기 쉽게 정리한 overlay 노트입니다.
 
-## 시험 Recap 학습 계획
-
-실습 빈칸을 풀기 전에 출제포인트와 원본 교안·노트북을 순서대로 복습하려면 [통합 Recap 계획](recap/00_master_recap_plan.md)부터 시작합니다.
-
-권장 순서는 **LLM → Vision → On-device AI → RAG**이며, 각 과목의 상세 파일은 다음과 같습니다.
-
-- [LLM Recap](recap/01_llm_recap_plan.md)
-- [Vision Recap](recap/02_vision_recap_plan.md)
-- [On-device AI Recap](recap/03_on_device_ai_recap_plan.md)
-- [RAG Recap](recap/04_rag_recap_plan.md)
-
-Data는 별도 교안/실습을 학습하기 전까지 보류합니다.
-
 ## On-Device AI — Lecture notes
 
 | 순서 | 복습 노트 | 원본 |
