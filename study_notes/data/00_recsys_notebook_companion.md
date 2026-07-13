@@ -24,7 +24,15 @@
 
 예측 logits가 `[B,1]`이면 loss 전 `view(-1)` 또는 target을 `[B,1]`로 맞춘다. `BCEWithLogitsLoss`는 sigmoid 전 logits를 받는다.
 
-## 3. 학습·평가 API 순서
+## 3. Encoder와 graph propagation
+
+- **NCF encoder**: user/item embedding lookup 후 GMF 경로(`u * v`)와 MLP 경로(`concat → Linear/ReLU`)를 각각 계산하고 마지막 head가 `[B]` logits를 낸다.
+- **GCF encoder**: bipartite graph의 이웃 embedding을 정규화해 message passing한다. layer `l`의 node 표현은 대략 `E^(l+1)=σ(A_norm E^l W_l)`이며, 여러 층 표현을 concat/pool해 user/item score에 사용한다.
+- **NGCF encoder**: 이웃 신호와 element-wise interaction(`e_i ⊙ e_j`)을 함께 전파해 단순 평균보다 고차 선호 상호작용을 보존한다.
+
+따라서 `edge_index=[2,E]`는 encoder의 입력 그래프이고, user/item row를 분리한 뒤 dot product 또는 prediction head로 score를 만든다. NCF는 graph encoder가 없어 `edge_index`가 필요하지 않다.
+
+## 4. 학습·평가 API 순서
 
 ```python
 model.train()
@@ -43,7 +51,8 @@ with torch.no_grad():
 평가에서는 이미 본 item을 후보에서 제외하고, user마다 candidate score를 정렬해 top-k를 만든다. 단순 accuracy는 negative가 많은 추천 문제를 과대평가하므로 ranking metric을 함께 쓴다.
 
 - `HR@K`: 정답 item이 top-k에 있으면 1; 높을수록 좋다.
-- `Recall@K`: relevant item 중 top-k에 포함된 비율.
+- `Precision@K`: 추천된 K개 중 relevant item 비율(`hits / K`); 높을수록 좋다.
+- `Recall@K`: relevant item 중 top-k에 포함된 비율(`hits / relevant_count`); 높을수록 좋다.
 - `NDCG@K`: 순위가 앞일수록 큰 discount; 높을수록 좋다.
 - RMSE/MAE: explicit rating 회귀에서 사용; 낮을수록 좋다.
 
