@@ -433,6 +433,36 @@ window.AI_STUDY_NOTES = [
     ]
   },
   {
+    "id": "data-exam-overview",
+    "title": "AISP 데이터 과목. 시험 초점과 실습 지도",
+    "section": "Data / Exam Focus",
+    "path": "study_notes/data/00_exam_data_overview.md"
+  },
+  {
+    "id": "rag-day1-code-companion",
+    "title": "RAG Day 1. LlamaIndex 실습 코드 동반 복습",
+    "section": "RAG / Day 1 / Code Companion",
+    "path": "study_notes/rag/day1/02_rag_day1_code_companion.md"
+  },
+  {
+    "id": "rag-day2-mcp-code-companion",
+    "title": "RAG Day 2. MCP Text2SQL 코드 동반 복습",
+    "section": "RAG / Day 2 / MCP Code Companion",
+    "path": "study_notes/rag/day2/03_mcp_text2sql_code_companion.md"
+  },
+  {
+    "id": "data-ts-notebook-companion",
+    "title": "Time Series 03–04. Notebook 동반 복습",
+    "section": "Data / Time Series / Code Companion",
+    "path": "study_notes/data/04_time_series_notebook_companion.md"
+  },
+  {
+    "id": "data-recsys-notebook-companion",
+    "title": "Recommender System 07–08. Notebook 동반 복습",
+    "section": "Data / Recommender System / Code Companion",
+    "path": "study_notes/data/05_recommender_notebook_companion.md"
+  },
+  {
     "id": "data-ts-advanced",
     "title": "Time Series 02. 심화 강의자료",
     "section": "Data / Time Series",
