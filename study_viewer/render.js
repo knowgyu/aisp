@@ -348,7 +348,7 @@
     rawLink.textContent = note.kind === 'notebook' ? 'Guide MD' : 'Raw MD';
     if (sideNote) {
       sideNote.textContent = note.kind === 'notebook'
-        ? '실습 페이지는 왼쪽 설명과 오른쪽 시험 대비 노트북 HTML을 동시에 보여줍니다. 핵심 셀은 정답 입력용으로 비워 두고, 원본과 해설은 별도 보존합니다.'
+        ? '실습 페이지는 왼쪽 설명과 오른쪽 원본 노트북 HTML을 함께 보여줍니다. 노트북은 원본 셀과 실행 결과를 유지합니다.'
         : '왼쪽에서 노트를 고르면 오른쪽에 Markdown 원문이 문서형으로 렌더링됩니다. 수식, Mermaid, 이미지를 함께 확인합니다.';
     }
   }
@@ -366,15 +366,15 @@
         panel.innerHTML = `
           <div class="notebook-layout" data-note-kind="notebook">
             <section class="notebook-guide markdown-body" aria-label="Curated notebook guide">${guideHtml}</section>
-            <aside class="notebook-frame-panel" aria-label="Exam practice notebook HTML">
-              <div class="notebook-frame-head">
-                <strong>시험 대비 실습 Notebook</strong>
-                <span>
-                  ${note.practiceIpynb ? `<a href="${escapeHtml(note.practiceIpynb)}" download>실습본 .ipynb</a>` : ''}
+              <aside class="notebook-frame-panel" aria-label="Original notebook HTML">
+                <div class="notebook-frame-head">
+                  <strong>원본 실습 Notebook</strong>
+                  <span>
+                  ${note.practiceIpynb ? `<a href="${escapeHtml(note.practiceIpynb)}" download>원본 .ipynb</a>` : ''}
                   <a href="${escapeHtml(note.notebookHtml)}" target="_blank" rel="noreferrer">HTML 새 탭</a>
                 </span>
               </div>
-              <iframe class="notebook-iframe" title="${escapeHtml(note.title)} 시험 대비 실습 노트북 HTML" src="${escapeHtml(note.notebookHtml)}" sandbox="allow-scripts" loading="lazy"></iframe>
+              <iframe class="notebook-iframe" title="${escapeHtml(note.title)} 원본 실습 노트북 HTML" src="${escapeHtml(note.notebookHtml)}" sandbox="allow-scripts" loading="lazy"></iframe>
             </aside>
           </div>
         `;

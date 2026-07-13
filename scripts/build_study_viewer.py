@@ -17,7 +17,6 @@ import sync_study_viewer
 ROOT = Path(__file__).resolve().parents[1]
 CONVERTER = ROOT / 'scripts' / 'convert_ipynb_static.py'
 VERIFY = ROOT / 'study_viewer' / 'verify-static-curriculum.js'
-PRACTICE_GENERATOR = ROOT / 'scripts' / 'generate_exam_practice.py'
 
 
 def notebook_entries():
@@ -73,7 +72,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--verify', action='store_true', help='run the static curriculum verifier after build')
     args = parser.parse_args(argv)
 
-    subprocess.run([sys.executable, str(PRACTICE_GENERATOR)], cwd=ROOT, check=True)
     converted = convert_notebooks(force=args.force)
     copied_notebooks = copy_practice_notebooks()
     copied = sync_study_viewer.copy_allowed()

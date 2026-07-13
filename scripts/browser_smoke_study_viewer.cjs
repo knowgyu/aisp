@@ -67,7 +67,7 @@ function loadPlaywright() {
  await frame.locator('mjx-container').first().waitFor({ state: 'visible', timeout: 20000 });
  const text = await frame.locator('body').innerText({ timeout: 15000 });
  if (!/Pruning for CNN|Assignment 1/i.test(text)) throw new Error('notebook body text missing expected title');
- if (!/## 정답 입력/.test(text)) throw new Error('exam-practice answer-input marker missing');
+ if (/## 정답 입력/.test(text)) throw new Error('original notebook unexpectedly contains exam-practice markers');
 
     await page.goto(`${baseUrl}#rag-day2-practice-01-mcp-evaluation`, { waitUntil: 'networkidle' });
     const ragTitle = await page.locator('#note-title').innerText({ timeout: 15000 });
@@ -79,7 +79,7 @@ function loadPlaywright() {
     if (!ragFrame) throw new Error('RAG Day 2 MCP notebook frame not found');
     await ragFrame.locator('.nb-cell').first().waitFor({ state: 'visible', timeout: 15000 });
     const ragText = await ragFrame.locator('body').innerText({ timeout: 15000 });
-    if (!/## 정답 입력/.test(ragText)) throw new Error('RAG Day 2 practice drill missing');
+ if (/## 정답 입력/.test(ragText)) throw new Error('RAG Day 2 original notebook contains exam-practice markers');
 
     console.log('RESULT PASS browser split-view smoke');
     console.log(JSON.stringify({ guideBox, iframeBox, containerBox, sandbox }));

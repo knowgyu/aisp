@@ -60,8 +60,7 @@ window.AI_STUDY_NOTES = [
     "section": "On-Device AI / Practice",
     "path": "study_notes/on_device_ai/practice/01_pruning_cnn_practice_guide.md",
     "notebookHtml": "notebooks/on_device_ai/01_pruning_cnn.html",
-    "sourceIpynb": "practice_notebooks/on_device_ai/01-pruning-cnn.ipynb",
-    "referenceIpynb": "On-Device AI 강의자료/실습/1. Pruning for CNN.ipynb",
+    "sourceIpynb": "On-Device AI 강의자료/실습/1. Pruning for CNN.ipynb",
     "practiceIpynb": "notebooks/on_device_ai/01_pruning_cnn.ipynb"
   },
   {
@@ -71,8 +70,7 @@ window.AI_STUDY_NOTES = [
     "section": "On-Device AI / Practice",
     "path": "study_notes/on_device_ai/practice/02_quantization_cnn_practice_guide.md",
     "notebookHtml": "notebooks/on_device_ai/02_quantization_cnn.html",
-    "sourceIpynb": "practice_notebooks/on_device_ai/02-quantization-cnn.ipynb",
-    "referenceIpynb": "On-Device AI 강의자료/실습/2. Quantization for CNN.ipynb",
+    "sourceIpynb": "On-Device AI 강의자료/실습/2. Quantization for CNN.ipynb",
     "practiceIpynb": "notebooks/on_device_ai/02_quantization_cnn.ipynb"
   },
   {
@@ -82,8 +80,7 @@ window.AI_STUDY_NOTES = [
     "section": "On-Device AI / Practice",
     "path": "study_notes/on_device_ai/practice/03_knowledge_distillation_practice_guide.md",
     "notebookHtml": "notebooks/on_device_ai/03_knowledge_distillation.html",
-    "sourceIpynb": "practice_notebooks/on_device_ai/03-knowledge-distillation.ipynb",
-    "referenceIpynb": "On-Device AI 강의자료/실습/3. Knowledge Distillation.ipynb",
+    "sourceIpynb": "On-Device AI 강의자료/실습/3. Knowledge Distillation.ipynb",
     "practiceIpynb": "notebooks/on_device_ai/03_knowledge_distillation.ipynb"
   },
   {
@@ -93,8 +90,7 @@ window.AI_STUDY_NOTES = [
     "section": "On-Device AI / Practice",
     "path": "study_notes/on_device_ai/practice/04_pruning_llm_practice_guide.md",
     "notebookHtml": "notebooks/on_device_ai/04_pruning_llm.html",
-    "sourceIpynb": "practice_notebooks/on_device_ai/04-pruning-llm.ipynb",
-    "referenceIpynb": "On-Device AI 강의자료/실습/4. Pruning for LLM.ipynb",
+    "sourceIpynb": "On-Device AI 강의자료/실습/4. Pruning for LLM.ipynb",
     "practiceIpynb": "notebooks/on_device_ai/04_pruning_llm.ipynb"
   },
   {
@@ -104,8 +100,7 @@ window.AI_STUDY_NOTES = [
     "section": "On-Device AI / Practice",
     "path": "study_notes/on_device_ai/practice/05_quantization_llm_practice_guide.md",
     "notebookHtml": "notebooks/on_device_ai/05_quantization_llm.html",
-    "sourceIpynb": "practice_notebooks/on_device_ai/05-quantization-llm.ipynb",
-    "referenceIpynb": "On-Device AI 강의자료/실습/5. Quantization for LLM.ipynb",
+    "sourceIpynb": "On-Device AI 강의자료/실습/5. Quantization for LLM.ipynb",
     "practiceIpynb": "notebooks/on_device_ai/05_quantization_llm.ipynb"
   },
   {
@@ -193,8 +188,7 @@ window.AI_STUDY_NOTES = [
     "section": "Vision / Practice",
     "path": "study_notes/vision/practice/01_resnet18_cifar10_practice_guide.md",
     "notebookHtml": "notebooks/vision/01_resnet18_cifar10.html",
-    "sourceIpynb": "practice_notebooks/vision/01-resnet18-cifar10.ipynb",
-    "referenceIpynb": "vision/01_ResNet18_CIFAR10.ipynb",
+    "sourceIpynb": "vision/01_ResNet18_CIFAR10.ipynb",
     "practiceIpynb": "notebooks/vision/01_resnet18_cifar10.ipynb"
   },
   {
@@ -204,8 +198,7 @@ window.AI_STUDY_NOTES = [
     "section": "Vision / Practice",
     "path": "study_notes/vision/practice/02_vit_cifar10_practice_guide.md",
     "notebookHtml": "notebooks/vision/02_vit_cifar10.html",
-    "sourceIpynb": "practice_notebooks/vision/02-vit-cifar10.ipynb",
-    "referenceIpynb": "vision/02_ViT_CIFAR10.ipynb",
+    "sourceIpynb": "vision/02_ViT_CIFAR10.ipynb",
     "practiceIpynb": "notebooks/vision/02_vit_cifar10.ipynb"
   },
   {
@@ -215,8 +208,7 @@ window.AI_STUDY_NOTES = [
     "section": "Vision / Practice",
     "path": "study_notes/vision/practice/03_detr_practice_guide.md",
     "notebookHtml": "notebooks/vision/03_detr.html",
-    "sourceIpynb": "practice_notebooks/vision/03-detr.ipynb",
-    "referenceIpynb": "vision/03_DETR.ipynb",
+    "sourceIpynb": "vision/03_DETR.ipynb",
     "practiceIpynb": "notebooks/vision/03_detr.ipynb"
   },
   {
@@ -226,8 +218,7 @@ window.AI_STUDY_NOTES = [
     "section": "Vision / Practice",
     "path": "study_notes/vision/practice/04_unet_practice_guide.md",
     "notebookHtml": "notebooks/vision/04_unet.html",
-    "sourceIpynb": "practice_notebooks/vision/04-unet.ipynb",
-    "referenceIpynb": "vision/04_Unet.ipynb",
+    "sourceIpynb": "vision/04_Unet.ipynb",
     "practiceIpynb": "notebooks/vision/04_unet.ipynb"
   },
   {
@@ -237,8 +228,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/01_vector_space_practice_guide.md",
     "notebookHtml": "notebooks/language/01_vector_space.html",
-    "sourceIpynb": "practice_notebooks/language/01-vector-space.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_1_Exercise_Vector Space.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_1_Exercise_Vector Space.ipynb",
     "practiceIpynb": "notebooks/language/01_vector_space.ipynb"
   },
   {
@@ -248,8 +238,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/02_dataset_practice_guide.md",
     "notebookHtml": "notebooks/language/02_dataset.html",
-    "sourceIpynb": "practice_notebooks/language/02-dataset.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_2_Exercise_Dataset.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_2_Exercise_Dataset.ipynb",
     "practiceIpynb": "notebooks/language/02_dataset.ipynb"
   },
   {
@@ -259,8 +248,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/03_attention_practice_guide.md",
     "notebookHtml": "notebooks/language/03_attention.html",
-    "sourceIpynb": "practice_notebooks/language/03-attention.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_3_Excercise_Attention.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_3_Excercise_Attention.ipynb",
     "practiceIpynb": "notebooks/language/03_attention.ipynb"
   },
   {
@@ -270,8 +258,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/03_attention_visualization_practice_guide.md",
     "notebookHtml": "notebooks/language/03_attention_visualization.html",
-    "sourceIpynb": "practice_notebooks/language/03-attention-visualization.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_3_Excercise_Viz_Multi_head_attention.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_3_Excercise_Viz_Multi_head_attention.ipynb",
     "practiceIpynb": "notebooks/language/03_attention_visualization.ipynb"
   },
   {
@@ -281,8 +268,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/04_gpt_practice_guide.md",
     "notebookHtml": "notebooks/language/04_gpt.html",
-    "sourceIpynb": "practice_notebooks/language/04-gpt.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_4_Excercise_GPT.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_4_Excercise_GPT.ipynb",
     "practiceIpynb": "notebooks/language/04_gpt.ipynb"
   },
   {
@@ -292,8 +278,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/05_pretraining_practice_guide.md",
     "notebookHtml": "notebooks/language/05_pretraining.html",
-    "sourceIpynb": "practice_notebooks/language/05-pretraining.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_5_Excercise_Pretraining.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_5_Excercise_Pretraining.ipynb",
     "practiceIpynb": "notebooks/language/05_pretraining.ipynb"
   },
   {
@@ -303,8 +288,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/06_classification_finetuning_practice_guide.md",
     "notebookHtml": "notebooks/language/06_classification_finetuning.html",
-    "sourceIpynb": "practice_notebooks/language/06-classification-finetuning.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_6_Excercise_Finetuning_Classification.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_6_Excercise_Finetuning_Classification.ipynb",
     "practiceIpynb": "notebooks/language/06_classification_finetuning.ipynb"
   },
   {
@@ -314,8 +298,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/06_lora_classification_practice_guide.md",
     "notebookHtml": "notebooks/language/06_lora_classification.html",
-    "sourceIpynb": "practice_notebooks/language/06-lora-classification.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_6_Excercise_Finetuning_Classification_LoRA.ipynb",
     "practiceIpynb": "notebooks/language/06_lora_classification.ipynb"
   },
   {
@@ -325,8 +308,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/07_instruction_finetuning_practice_guide.md",
     "notebookHtml": "notebooks/language/07_instruction_finetuning.html",
-    "sourceIpynb": "practice_notebooks/language/07-instruction-finetuning.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb",
     "practiceIpynb": "notebooks/language/07_instruction_finetuning.ipynb"
   },
   {
@@ -336,8 +318,7 @@ window.AI_STUDY_NOTES = [
     "section": "Language / LLM Practice",
     "path": "study_notes/language/practice/07_dpo_practice_guide.md",
     "notebookHtml": "notebooks/language/07_dpo.html",
-    "sourceIpynb": "practice_notebooks/language/07-dpo.ipynb",
-    "referenceIpynb": "llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb",
+    "sourceIpynb": "llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb",
     "practiceIpynb": "notebooks/language/07_dpo.ipynb"
   },
   {
@@ -353,8 +334,7 @@ window.AI_STUDY_NOTES = [
     "section": "RAG / Day 1 Practice",
     "path": "study_notes/rag/practice/01_llama_index_practice_guide.md",
     "notebookHtml": "notebooks/rag/day1/01_llama_index.html",
-    "sourceIpynb": "practice_notebooks/rag/day1/01-llama-index.ipynb",
-    "referenceIpynb": "rag/1일차/실습 자료/Code/1. Llama_index.ipynb",
+    "sourceIpynb": "rag/1일차/실습 자료/Code/1. Llama_index.ipynb",
     "practiceIpynb": "notebooks/rag/day1/01_llama_index.ipynb"
   },
   {
@@ -364,8 +344,7 @@ window.AI_STUDY_NOTES = [
     "section": "RAG / Day 1 Practice",
     "path": "study_notes/rag/practice/02_rag_practice_guide.md",
     "notebookHtml": "notebooks/rag/day1/02_rag_app.html",
-    "sourceIpynb": "practice_notebooks/rag/day1/02-rag-app.ipynb",
-    "referenceIpynb": "rag/1일차/실습 자료/Code/2. RAG.ipynb",
+    "sourceIpynb": "rag/1일차/실습 자료/Code/2. RAG.ipynb",
     "practiceIpynb": "notebooks/rag/day1/02_rag_app.ipynb"
   },
   {
@@ -381,8 +360,7 @@ window.AI_STUDY_NOTES = [
     "section": "RAG / Day 2 / 1. MCP Practice",
     "path": "study_notes/rag/day2/practice/01_mcp_evaluation_practice_guide.md",
     "notebookHtml": "notebooks/rag/day2/01_mcp_evaluation.html",
-    "sourceIpynb": "practice_notebooks/rag/day2/01_mcp_evaluation.ipynb",
-    "referenceIpynb": "rag/2일차/실습 자료/Code/4_RAG_framework_evaluation_with_MCP.ipynb",
+    "sourceIpynb": "rag/2일차/실습 자료/Code/4_RAG_framework_evaluation_with_MCP.ipynb",
     "practiceIpynb": "notebooks/rag/day2/01_mcp_evaluation.ipynb"
   },
   {
@@ -398,8 +376,7 @@ window.AI_STUDY_NOTES = [
     "section": "RAG / Day 2 / 2. GraphRAG Practice",
     "path": "study_notes/rag/day2/practice/02_data_preprocessing_practice_guide.md",
     "notebookHtml": "notebooks/rag/day2/02_data_preprocessing.html",
-    "sourceIpynb": "practice_notebooks/rag/day2/02_data_preprocessing.ipynb",
-    "referenceIpynb": "rag/2일차/실습 자료/Code/1. Data_preprocessing.ipynb",
+    "sourceIpynb": "rag/2일차/실습 자료/Code/1. Data_preprocessing.ipynb",
     "practiceIpynb": "notebooks/rag/day2/02_data_preprocessing.ipynb"
   },
   {
@@ -409,8 +386,7 @@ window.AI_STUDY_NOTES = [
     "section": "RAG / Day 2 / 2. GraphRAG Practice",
     "path": "study_notes/rag/day2/practice/03_web_rag_practice_guide.md",
     "notebookHtml": "notebooks/rag/day2/03_web_rag.html",
-    "sourceIpynb": "practice_notebooks/rag/day2/03_web_rag.ipynb",
-    "referenceIpynb": "rag/2일차/실습 자료/Code/2. Task_1.ipynb",
+    "sourceIpynb": "rag/2일차/실습 자료/Code/2. Task_1.ipynb",
     "practiceIpynb": "notebooks/rag/day2/03_web_rag.ipynb"
   },
   {
@@ -420,8 +396,7 @@ window.AI_STUDY_NOTES = [
     "section": "RAG / Day 2 / 2. GraphRAG Practice",
     "path": "study_notes/rag/day2/practice/04_kg_rag_practice_guide.md",
     "notebookHtml": "notebooks/rag/day2/04_kg_rag.html",
-    "sourceIpynb": "practice_notebooks/rag/day2/04_kg_rag.ipynb",
-    "referenceIpynb": "rag/2일차/실습 자료/Code/3. Task_2.ipynb",
+    "sourceIpynb": "rag/2일차/실습 자료/Code/3. Task_2.ipynb",
     "practiceIpynb": "notebooks/rag/day2/04_kg_rag.ipynb"
   },
   {

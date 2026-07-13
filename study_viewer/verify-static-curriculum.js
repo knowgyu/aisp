@@ -182,27 +182,20 @@ function validateNotes(notes) {
 function validateNotebookEntry(note, label) {
   assertCheck(note.kind === 'notebook', `${label} has kind notebook`);
   assertCheck(typeof note.notebookHtml === 'string' && note.notebookHtml.startsWith('notebooks/'), `${label} notebookHtml stays under notebooks/`);
-  assertCheck(typeof note.sourceIpynb === 'string' && note.sourceIpynb.startsWith('practice_notebooks/') && note.sourceIpynb.endsWith('.ipynb'), `${label} sourceIpynb records generated practice notebook`);
+  assertCheck(typeof note.sourceIpynb === 'string' && note.sourceIpynb.endsWith('.ipynb') && !note.sourceIpynb.startsWith('practice_notebooks/'), `${label} sourceIpynb records original notebook`);
   assertCheck(typeof note.practiceIpynb === 'string' && note.practiceIpynb.startsWith('notebooks/') && note.practiceIpynb.endsWith('.ipynb'), `${label} practiceIpynb stays under public notebooks`);
-  assertCheck(typeof note.referenceIpynb === 'string' && note.referenceIpynb.endsWith('.ipynb'), `${label} referenceIpynb records untouched original notebook`);
   const practicePath = path.join(ROOT, note.sourceIpynb);
-  const referencePath = path.join(ROOT, note.referenceIpynb);
-  assertCheck(fs.existsSync(practicePath), `${label} generated practice notebook exists`);
-  const localOnlyReference = note.referenceIpynb.startsWith('llm_hands_on/');
-  assertCheck(
-    fs.existsSync(referencePath) || localOnlyReference,
-    `${label} original reference notebook exists or is documented local-only`,
-  );
+  assertCheck(fs.existsSync(practicePath), `${label} original notebook exists`);
   const publicPracticePath = path.join(APP_DIR, note.practiceIpynb);
   assertCheck(fs.existsSync(publicPracticePath), `${label} downloadable practice notebook exists`);
   if (fs.existsSync(practicePath) && fs.existsSync(publicPracticePath)) {
-    assertCheck(fs.readFileSync(practicePath).equals(fs.readFileSync(publicPracticePath)), `${label} downloadable practice notebook matches generated source`);
+    assertCheck(fs.readFileSync(practicePath).equals(fs.readFileSync(publicPracticePath)), `${label} downloadable notebook matches original source`);
   }
   if (fs.existsSync(practicePath)) {
     const practice = JSON.parse(fs.readFileSync(practicePath, 'utf8'));
     const practiceCells = Array.isArray(practice.cells) ? practice.cells : [];
-    assertCheck(Boolean(practice.metadata && practice.metadata.aisp_exam_practice), `${label} practice notebook records generation metadata`);
-    assertCheck(practiceCells.some((cell) => /## 정답 입력/.test(Array.isArray(cell.source) ? cell.source.join('') : String(cell.source || ''))), `${label} practice notebook includes answer-input drills`);
+    assertCheck(!practice.metadata?.aisp_exam_practice, `${label} notebook is not an exam-practice artifact`);
+    assertCheck(!practiceCells.some((cell) => /## 정답 입력/.test(Array.isArray(cell.source) ? cell.source.join('') : String(cell.source || ''))), `${label} notebook has no exam-answer markers`);
   }
   const sourceGuidePath = path.join(ROOT, note.path);
   const publicGuidePath = path.join(APP_DIR, note.path);
@@ -228,7 +221,7 @@ function validateNotebookEntry(note, label) {
   assertCheck(!/javascript\s*:/i.test(htmlWithoutAllowedMathJax), `${label} notebook HTML has no javascript URLs`);
   assertCheck(/nb-cell/.test(htmlText), `${label} notebook HTML contains notebook cells`);
   assertCheck(/nb-code/.test(htmlText), `${label} notebook HTML contains code cells`);
-  assertCheck(/## 정답 입력/.test(htmlText), `${label} notebook HTML exposes answer-input drills`);
+  assertCheck(!/## 정답 입력/.test(htmlText), `${label} notebook HTML has no exam-answer markers`);
   assertCheck(/Code Cell \d{3}/.test(htmlText), `${label} notebook HTML labels code cells by cell number`);
   assertCheck(/nb-code-line/.test(htmlText) && /nb-lineno/.test(htmlText), `${label} notebook HTML renders code line numbers`);
   assertCheck(!/In \[/.test(htmlText), `${label} notebook HTML omits old Jupyter In prompt labels`);
