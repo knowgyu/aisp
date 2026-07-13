@@ -46,3 +46,10 @@ rating RMSE가 좋다고 recommendation top-K가 좋은 것은 아니다. 목적
 ## 5. 시험 답안 한 줄
 
 GCF는 user-item graph의 이웃 정보를 embedding에 전파해 협업 신호를 누적하고, NCF는 user/item embedding 상호작용을 MLP로 비선형 학습한다. 둘 다 최종적으로 사용자-아이템 score를 만들지만 propagation/interaction 함수와 평가 목적을 구분해야 한다.
+
+## 6. 원본 notebook의 수치 앵커
+
+- 데이터: MovieLens latest-small `ratings.csv`; NCF는 `LabelEncoder`로 user/item을 연속 ID로 만들고 `random_state=42`로 9:1 분할한다.
+- NCF: user/item embedding 각각 32차원 → concat `[B,64]` → `Linear(64,32)+ReLU` → `Linear(32,1)`, `MSELoss`, Adam `0.001`, batch 128, 5 epochs. relevance threshold는 `rating >= 3.5`다.
+- GCF/NGCF: rating `>=1.0`을 implicit edge로 변환하며 item node index는 `movieId + num_users`; edge column split은 80/10/10이다.
+- NGCF는 초기 node embedding 64차원, `layer_dims=[64,64]`, degree normalization `1/sqrt(deg(u)*deg(i))`, self/neighbor message와 LeakyReLU/dropout을 사용한다. 학습 objective는 positive/negative item을 비교하는 BPR loss이고 Recall/Precision/NDCG@10으로 평가한다.

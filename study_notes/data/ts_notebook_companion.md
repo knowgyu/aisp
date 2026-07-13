@@ -41,3 +41,11 @@ index 정렬 -> 결측/주기 확인 -> X/Y 한 샘플 출력
 ```
 
 예측이 한 칸 밀리면 `X` 마지막 시점과 `Y` 첫 시점의 경계를 확인한다. `pred [B,1]`와 `target [B]` broadcasting은 허용되더라도 의도하지 않은 loss가 될 수 있으므로 `squeeze`/`reshape`를 명시한다.
+
+## 5. 원본 notebook의 수치 앵커
+
+- 데이터: `yfinance`의 `GOOG`, 2020-01-01~2024-12-31, target `Open`; train/test는 `[1006,1]`/`[251,1]`(80/20)이다.
+- `sequence_length=50` 후 `X_train [956,50,1]`, `y_train [956]`, `X_test [201,50,1]`, `y_test [201]`.
+- 주 모델: `LSTM(input_size=1, hidden_size=64, num_layers=2, batch_first=True)`와 `Linear(64,1)`, `MSELoss`, `Adam(lr=1e-3)`, batch 32, 10 epochs.
+- 해답 실행의 비교값: LSTM RMSE/MAPE `0.1194/0.0847`, Conv1D `0.0345/0.0197`, vanilla RNN `0.0862/0.0606`.
+- 선택 seq2seq는 target length 10이며 test shape `[191,50,1]`→`[191,10,1]`이다. 수치는 RMSE/MAPE `0.2088/0.1593`이다.

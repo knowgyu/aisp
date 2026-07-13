@@ -42,3 +42,8 @@
 > 입력의 각 축은 무엇인가? (`[B,L,F]` 또는 user/item ID `[B]`) → 어떤 객체가 shape를 바꾸는가? (window, embedding, transpose, `unsqueeze`) → loss가 비교하는 두 tensor shape는 같은가? → 평가 시 미래 정보/seen item이 섞이지 않았는가?
 
 원본 PDF와 notebook은 변경하지 않았으며 이 파일은 viewer용 overlay다.
+
+## 6. Notebook API 앵커
+
+- 시계열 notebook은 `yfinance.download("GOOG", start="2020-01-01", end="2024-12-31")`로 `Open`을 가져오고, `MinMaxScaler`, `DataLoader`, `nn.LSTM`, `MSELoss`, `Adam` API를 연결한다.
+- 추천 notebook은 MovieLens `ratings.csv`를 읽고 `LabelEncoder`, `nn.Embedding`, `torch.topk`와 RMSE/Precision@10/Recall@10/NDCG@10을 사용한다.
