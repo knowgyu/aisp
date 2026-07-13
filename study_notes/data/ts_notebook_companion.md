@@ -49,3 +49,7 @@ index 정렬 -> 결측/주기 확인 -> X/Y 한 샘플 출력
 - 주 모델: `LSTM(input_size=1, hidden_size=64, num_layers=2, batch_first=True)`와 `Linear(64,1)`, `MSELoss`, `Adam(lr=1e-3)`, batch 32, 10 epochs.
 - 해답 실행의 비교값: LSTM RMSE/MAPE `0.1194/0.0847`, Conv1D `0.0345/0.0197`, vanilla RNN `0.0862/0.0606`.
 - 선택 seq2seq는 target length 10이며 test shape `[191,50,1]`→`[191,10,1]`이다. 수치는 RMSE/MAPE `0.2088/0.1593`이다.
+
+## 6. metric 메모
+
+RMSE와 MAPE metric은 inverse transform 후 계산하고, naive baseline과 비교한다.

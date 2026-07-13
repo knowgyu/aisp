@@ -62,3 +62,7 @@ response = query_engine.query("...")
 ```
 
 핵심은 함수명 암기보다 `Document → Node → Index → Retriever → QueryEngine → Response/source_nodes` 책임 분리다.
+
+## 6. metric 메모
+
+retrieval metric과 generation metric을 분리한다. 최소 `Recall@K`, `MRR`, citation correctness를 함께 기록한다.
