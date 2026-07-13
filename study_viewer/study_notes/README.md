@@ -64,6 +64,14 @@ Vision 05+ generative material은 이번 시험 준비 public viewer 범위에�
 | 07 | [Instruction Fine-tuning](language/07_instruction_finetuning_deep_review.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions.ipynb` |
 | 07+ | [DPO — optional](language/07_dpo_deep_review.md) | `llm_hands_on/Chapter_7_Exercise_Follow_Instructions_dpo.ipynb` |
 
+## Data — Exam focus companions
+
+원본 PDF와 notebook을 읽기 전에 shape·data flow·API·metric을 빠르게 점검합니다.
+
+- [Data 과목 시험 포커스](data/00_data_exam_focus.md)
+- [Time Series Notebook 시험 동반 노트](data/ts_notebook_exam_companion.md)
+- [Recommender Notebook 시험 동반 노트](data/recsys_notebook_exam_companion.md)
+
 ## RAG — Day 1
 
 | 순서 | 복습 노트 / 실습 가이드 | 원본 |

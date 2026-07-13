@@ -526,5 +526,35 @@ window.AI_STUDY_NOTES = [
     "notebookHtml": "notebooks/data/recsys_ncf.html",
     "sourceIpynb": "data/7_8-recsys-practice/RecSys_NCF.ipynb",
     "practiceIpynb": "notebooks/data/recsys_ncf.ipynb"
-  }
+  },
+  {
+    "id": "data-exam-focus",
+    "title": "Data 과목 시험 포커스: Time Series와 Recommender System",
+    "section": "Data / Exam Focus",
+    "path": "study_notes/data/00_data_exam_focus.md"
+  },
+  {
+    "id": "rag-day1-exam-companion",
+    "title": "RAG Day 1 시험 동반 노트",
+    "section": "RAG / Day 1 / Exam Focus",
+    "path": "study_notes/rag/day1/02_rag_day1_exam_companion.md"
+  },
+  {
+    "id": "rag-day2-mcp-exam-companion",
+    "title": "RAG Day 2 MCP 시험 동반 노트",
+    "section": "RAG / Day 2 / Exam Focus",
+    "path": "study_notes/rag/day2/03_mcp_exam_companion.md"
+  },
+  {
+    "id": "data-ts-notebook-exam-companion",
+    "title": "Time Series Notebook 시험 동반 노트",
+    "section": "Data / Time Series / Exam Focus",
+    "path": "study_notes/data/ts_notebook_exam_companion.md"
+  },
+  {
+    "id": "data-recsys-notebook-exam-companion",
+    "title": "Recommender Notebook 시험 동반 노트",
+    "section": "Data / Recommender System / Exam Focus",
+    "path": "study_notes/data/recsys_notebook_exam_companion.md"
+  },
 ];
